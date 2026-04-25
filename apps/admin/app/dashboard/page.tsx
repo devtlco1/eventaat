@@ -1,13 +1,10 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Button } from '../../components/Button';
 import { getMe, type MeResponse } from '../../lib/api';
-import { clearToken, getToken } from '../../lib/auth';
+import { getToken } from '../../lib/auth';
 
 export default function DashboardPage() {
-  const router = useRouter();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -15,7 +12,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const token = getToken();
     if (!token) {
-      router.replace('/login');
+      setLoading(false);
       return;
     }
 
@@ -38,61 +35,36 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
-
-  function logout() {
-    clearToken();
-    router.replace('/login');
-  }
+  }, []);
 
   return (
-    <div className="min-h-dvh bg-zinc-50">
-      <header className="border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-          <div>
-            <div className="text-sm font-semibold text-zinc-900">
-              eventaat Admin
+    <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
+      {loading ? (
+        <div className="text-sm text-zinc-600">Loading…</div>
+      ) : error ? (
+        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </div>
+      ) : me ? (
+        <div className="space-y-3">
+          <div className="text-lg font-semibold text-zinc-900">Signed in</div>
+          <div className="grid gap-2 text-sm">
+            <div className="flex items-center justify-between rounded-md bg-zinc-50 px-3 py-2">
+              <span className="text-zinc-600">Email</span>
+              <span className="font-medium text-zinc-900">{me.email}</span>
             </div>
-            <div className="text-xs text-zinc-500">Dashboard</div>
+            <div className="flex items-center justify-between rounded-md bg-zinc-50 px-3 py-2">
+              <span className="text-zinc-600">Role</span>
+              <span className="font-medium text-zinc-900">{me.role}</span>
+            </div>
           </div>
-          <Button variant="secondary" onClick={logout}>
-            Logout
-          </Button>
+          <p className="text-xs text-zinc-500">
+            Restaurant management UI will be added in later steps.
+          </p>
         </div>
-      </header>
-
-      <main className="mx-auto max-w-5xl px-6 py-10">
-        <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-          {loading ? (
-            <div className="text-sm text-zinc-600">Loading…</div>
-          ) : error ? (
-            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {error}
-            </div>
-          ) : me ? (
-            <div className="space-y-3">
-              <div className="text-lg font-semibold text-zinc-900">
-                Signed in
-              </div>
-              <div className="grid gap-2 text-sm">
-                <div className="flex items-center justify-between rounded-md bg-zinc-50 px-3 py-2">
-                  <span className="text-zinc-600">Email</span>
-                  <span className="font-medium text-zinc-900">{me.email}</span>
-                </div>
-                <div className="flex items-center justify-between rounded-md bg-zinc-50 px-3 py-2">
-                  <span className="text-zinc-600">Role</span>
-                  <span className="font-medium text-zinc-900">{me.role}</span>
-                </div>
-              </div>
-              <p className="text-xs text-zinc-500">
-                Restaurant management UI will be added in later steps.
-              </p>
-            </div>
-          ) : (
-            <div className="text-sm text-zinc-600">No user data.</div>
-          )}
-        </div>
-      </main>
+      ) : (
+        <div className="text-sm text-zinc-600">No user data.</div>
+      )}
     </div>
   );
 }

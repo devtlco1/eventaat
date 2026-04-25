@@ -7,6 +7,10 @@ import { AppModule } from './app.module';
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
 
+  app.enableCors({
+    origin: ['http://localhost:3000'],
+  });
+
   // Global request validation. `whitelist` strips unknown fields,
   // `forbidNonWhitelisted` rejects them with 400, and `transform` turns
   // plain JSON into class instances so DTO defaults / typing work.

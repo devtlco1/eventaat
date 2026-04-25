@@ -71,3 +71,45 @@ export function getMe(token: string): Promise<MeResponse> {
   return apiRequest<MeResponse>('/auth/me', { method: 'GET', token });
 }
 
+export type Restaurant = {
+  id: string;
+  name: string;
+  description: string | null;
+  phone: string | null;
+  address: string;
+  city: string;
+  area: string | null;
+  latitude: string | null;
+  longitude: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function listRestaurants(token: string): Promise<Restaurant[]> {
+  return apiRequest<Restaurant[]>('/restaurants', { method: 'GET', token });
+}
+
+export type CreateRestaurantInput = {
+  name: string;
+  address: string;
+  city: string;
+  description?: string;
+  phone?: string;
+  area?: string;
+  latitude?: number;
+  longitude?: number;
+  isActive?: boolean;
+};
+
+export function createRestaurant(
+  token: string,
+  input: CreateRestaurantInput,
+): Promise<Restaurant> {
+  return apiRequest<Restaurant>('/restaurants', {
+    method: 'POST',
+    token,
+    body: JSON.stringify(input),
+  });
+}
+
