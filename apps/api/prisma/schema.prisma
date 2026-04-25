@@ -47,8 +47,23 @@ model Restaurant {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   admins RestaurantAdmin[]
+  tables RestaurantTable[]
 
   @@map("restaurants")
+}
+
+model RestaurantTable {
+  id           String   @id @default(uuid()) @db.Uuid
+  restaurantId String   @map("restaurant_id") @db.Uuid
+  name         String
+  capacity     Int
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("restaurant_tables")
 }
 
 /// Join table that links a RESTAURANT_ADMIN user to one or more restaurants.

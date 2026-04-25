@@ -2,13 +2,22 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  ForbiddenException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { Prisma, Restaurant, RestaurantAdmin, Role } from '@prisma/client';
+import {
+  Prisma,
+  Restaurant,
+  RestaurantAdmin,
+  RestaurantTable,
+  Role,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SafeUser } from '../users/users.service';
 import { CreateRestaurantDto } from './dto/create-restaurant.dto';
+import { CreateRestaurantTableDto } from './dto/create-restaurant-table.dto';
 import { UpdateRestaurantDto } from './dto/update-restaurant.dto';
+import { UpdateRestaurantTableDto } from './dto/update-restaurant-table.dto';
 
 @Injectable()
 export class RestaurantsService {
@@ -208,5 +217,114 @@ export class RestaurantsService {
     }
 
     return false;
+  }
+
+  // ─── Restaurant Tables ────────────────────────────────────────────────────
+
+  private async assertRestaurantVisible(
+    restaurantId: string,
+    viewer: SafeUser,
+  ): Promise<void> {
+    const restaurant = await this.prisma.restaurant.findUnique({
+      where: { id: restaurantId },
+      select: { id: true, isActive: true },
+    });
+
+    if (
+      !restaurant ||
+      (!restaurant.isActive && viewer.role !== Role.PLATFORM_ADMIN)
+    ) {
+      throw new NotFoundException('Restaurant not found');
+    }
+  }
+
+  private async assertCanManageRestaurant(
+    user: SafeUser,
+    restaurantId: string,
+  ): Promise<void> {
+    const allowed = await this.canManageRestaurant(user, restaurantId);
+    if (!allowed) {
+      // Requirement: RESTAURANT_ADMIN not assigned → 403.
+      if (user.role === Role.RESTAURANT_ADMIN) {
+        throw new ForbiddenException('You are not assigned to this restaurant');
+      }
+      throw new ForbiddenException('Insufficient role');
+    }
+  }
+
+  async createTable(
+    restaurantId: string,
+    dto: CreateRestaurantTableDto,
+    actor: SafeUser,
+  ): Promise<RestaurantTable> {
+    await this.assertRestaurantVisible(restaurantId, actor);
+    await this.assertCanManageRestaurant(actor, restaurantId);
+
+    return this.prisma.restaurantTable.create({
+      data: {
+        restaurantId,
+        name: dto.name,
+        capacity: dto.capacity,
+      },
+    });
+  }
+
+  async listTables(
+    restaurantId: string,
+    viewer: SafeUser,
+  ): Promise<RestaurantTable[]> {
+    await this.assertRestaurantVisible(restaurantId, viewer);
+
+    const where: Prisma.RestaurantTableWhereInput =
+      viewer.role === Role.CUSTOMER
+        ? { restaurantId, isActive: true }
+        : { restaurantId };
+
+    return this.prisma.restaurantTable.findMany({
+      where,
+      orderBy: [{ isActive: 'desc' }, { createdAt: 'asc' }],
+    });
+  }
+
+  async findTable(
+    restaurantId: string,
+    tableId: string,
+    viewer: SafeUser,
+  ): Promise<RestaurantTable> {
+    await this.assertRestaurantVisible(restaurantId, viewer);
+
+    const where: Prisma.RestaurantTableWhereInput =
+      viewer.role === Role.CUSTOMER
+        ? { id: tableId, restaurantId, isActive: true }
+        : { id: tableId, restaurantId };
+
+    const table = await this.prisma.restaurantTable.findFirst({ where });
+    if (!table) {
+      throw new NotFoundException('Table not found');
+    }
+    return table;
+  }
+
+  async updateTable(
+    restaurantId: string,
+    tableId: string,
+    dto: UpdateRestaurantTableDto,
+    actor: SafeUser,
+  ): Promise<RestaurantTable> {
+    await this.assertRestaurantVisible(restaurantId, actor);
+    await this.assertCanManageRestaurant(actor, restaurantId);
+
+    const existing = await this.prisma.restaurantTable.findFirst({
+      where: { id: tableId, restaurantId },
+      select: { id: true },
+    });
+    if (!existing) {
+      throw new NotFoundException('Table not found');
+    }
+
+    return this.prisma.restaurantTable.update({
+      where: { id: tableId },
+      data: dto,
+    });
   }
 }

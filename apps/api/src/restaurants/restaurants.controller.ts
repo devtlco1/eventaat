@@ -11,7 +11,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { Restaurant, RestaurantAdmin } from '@prisma/client';
+import { Restaurant, RestaurantAdmin, RestaurantTable } from '@prisma/client';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -19,7 +19,9 @@ import { RolesGuard } from '../auth/roles.guard';
 import { SafeUser } from '../users/users.service';
 import { AssignAdminDto } from './dto/assign-admin.dto';
 import { CreateRestaurantDto } from './dto/create-restaurant.dto';
+import { CreateRestaurantTableDto } from './dto/create-restaurant-table.dto';
 import { UpdateRestaurantDto } from './dto/update-restaurant.dto';
+import { UpdateRestaurantTableDto } from './dto/update-restaurant-table.dto';
 import { RestaurantsService } from './restaurants.service';
 
 /**
@@ -102,5 +104,64 @@ export class RestaurantsController {
     @Param('userId', new ParseUUIDPipe()) userId: string,
   ): Promise<void> {
     return this.restaurants.removeAdmin(restaurantId, userId);
+  }
+
+  // ─── Restaurant Tables ─────────────────────────────────────────────────────
+
+  /**
+   * POST /restaurants/:restaurantId/tables
+   * PLATFORM_ADMIN: allowed for any restaurant
+   * RESTAURANT_ADMIN: allowed only for assigned restaurants
+   */
+  @Post(':restaurantId/tables')
+  @Roles('PLATFORM_ADMIN', 'RESTAURANT_ADMIN')
+  createTable(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @Body() dto: CreateRestaurantTableDto,
+    @CurrentUser() user: SafeUser,
+  ): Promise<RestaurantTable> {
+    return this.restaurants.createTable(restaurantId, dto, user);
+  }
+
+  /**
+   * GET /restaurants/:restaurantId/tables
+   * CUSTOMER: active tables only
+   * Others: active + inactive
+   */
+  @Get(':restaurantId/tables')
+  listTables(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @CurrentUser() user: SafeUser,
+  ): Promise<RestaurantTable[]> {
+    return this.restaurants.listTables(restaurantId, user);
+  }
+
+  /**
+   * GET /restaurants/:restaurantId/tables/:tableId
+   * CUSTOMER: 404 for inactive tables
+   */
+  @Get(':restaurantId/tables/:tableId')
+  findTable(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @Param('tableId', new ParseUUIDPipe()) tableId: string,
+    @CurrentUser() user: SafeUser,
+  ): Promise<RestaurantTable> {
+    return this.restaurants.findTable(restaurantId, tableId, user);
+  }
+
+  /**
+   * PATCH /restaurants/:restaurantId/tables/:tableId
+   * PLATFORM_ADMIN: allowed for any restaurant
+   * RESTAURANT_ADMIN: allowed only for assigned restaurants
+   */
+  @Patch(':restaurantId/tables/:tableId')
+  @Roles('PLATFORM_ADMIN', 'RESTAURANT_ADMIN')
+  updateTable(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @Param('tableId', new ParseUUIDPipe()) tableId: string,
+    @Body() dto: UpdateRestaurantTableDto,
+    @CurrentUser() user: SafeUser,
+  ): Promise<RestaurantTable> {
+    return this.restaurants.updateTable(restaurantId, tableId, dto, user);
   }
 }
