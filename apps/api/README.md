@@ -2,40 +2,24 @@
 
 NestJS + Prisma backend for eventaat. PostgreSQL is the database.
 
-**Step 5 deliverable:** auth protection + RBAC foundation.
-- `GET /auth/me` (Bearer-token protected) returns the current user.
-- `@CurrentUser()` parameter decorator pulls the user off the request.
-- `@Roles(...)` + `RolesGuard` lock routes down to specific roles.
-- `GET /auth/admin-check` is a tiny verification endpoint for RolesGuard
-  (restricted to `PLATFORM_ADMIN`); no business endpoints yet.
+**Step 6 deliverable:** restaurants foundation.
+- New `Restaurant` model + migration `20260425120000_add_restaurant`.
+- `RestaurantsModule` with CRUD-ish endpoints (no DELETE in MVP — use `isActive=false`).
+- Create/Update locked to `PLATFORM_ADMIN`. List/Read open to any authenticated user (active only; admins see inactive too).
 
-## Folder layout
+## Endpoints (Step 6 surface)
 
-```
-apps/api/src/auth/
-├── auth.module.ts
-├── auth.controller.ts          # /register, /login, /me, /admin-check
-├── auth.service.ts
-├── jwt.strategy.ts
-├── jwt-auth.guard.ts
-├── jwt-payload.interface.ts
-├── current-user.decorator.ts   # @CurrentUser()
-├── roles.decorator.ts          # @Roles('PLATFORM_ADMIN', ...)
-├── roles.guard.ts              # checks request.user.role against @Roles()
-└── dto/
-    ├── register.dto.ts
-    └── login.dto.ts
-```
-
-## Endpoints (Step 5 surface)
-
-| Method | Path                | Auth                                 |
-|--------|---------------------|--------------------------------------|
-| POST   | `/auth/register`    | public                               |
-| POST   | `/auth/login`       | public                               |
-| GET    | `/auth/me`          | Bearer token (any authenticated user)|
-| GET    | `/auth/admin-check` | Bearer token + role `PLATFORM_ADMIN` |
-| GET    | `/health`           | public                               |
+| Method | Path                | Auth                                  |
+|--------|---------------------|---------------------------------------|
+| POST   | `/auth/register`    | public                                |
+| POST   | `/auth/login`       | public                                |
+| GET    | `/auth/me`          | Bearer                                |
+| GET    | `/auth/admin-check` | Bearer + `PLATFORM_ADMIN`             |
+| POST   | `/restaurants`      | Bearer + `PLATFORM_ADMIN`             |
+| GET    | `/restaurants`      | Bearer (admin sees inactive too)      |
+| GET    | `/restaurants/:id`  | Bearer (404 on inactive for non-admin)|
+| PATCH  | `/restaurants/:id`  | Bearer + `PLATFORM_ADMIN`             |
+| GET    | `/health`           | public                                |
 
 ## Local setup
 
@@ -43,107 +27,133 @@ From the **monorepo root** (`/Users/amjadmohammed/Documents/Claude/Projects/even
 
 ```bash
 npm install
-cp apps/api/.env.example apps/api/.env   # set JWT_SECRET (e.g. `openssl rand -hex 32`)
-docker start eventaat-pg                  # or docker run from Step 3
-npm run prisma:migrate -w @eventaat/api -- --name init_user   # only if not yet applied
+cp apps/api/.env.example apps/api/.env   # set JWT_SECRET if you haven't
+docker start eventaat-pg                  # or docker run from earlier steps
+
+# Apply the new restaurant migration
+npm run prisma:migrate -w @eventaat/api
+
+# Run the API on port 4000
 npm run dev -w @eventaat/api
 ```
 
-## Test the protected endpoints
+`prisma migrate dev` (no `--name`) detects that
+`prisma/migrations/20260425120000_add_restaurant/` is unapplied and runs it,
+then regenerates the Prisma client so `prisma.restaurant.*` is typed.
 
-### 1. Register a user (or skip if you already have one)
+## Test as PLATFORM_ADMIN
+
+You need a user with role `PLATFORM_ADMIN`. From a fresh DB:
 
 ```bash
+# 1. Register a normal user (defaults to CUSTOMER)
 curl -s -X POST http://localhost:4000/auth/register \
   -H 'Content-Type: application/json' \
-  -d '{"email":"amjad@example.com","password":"supersecret123","fullName":"Amjad Mohammed"}'
-```
+  -d '{"email":"admin@eventaat.com","password":"supersecret123","fullName":"Platform Admin"}'
 
-### 2. Log in and store the token
-
-```bash
-TOKEN=$(curl -s -X POST http://localhost:4000/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"amjad@example.com","password":"supersecret123"}' \
-  | python3 -c "import sys, json; print(json.load(sys.stdin)['accessToken'])")
-
-echo "$TOKEN"
-```
-
-### 3. Call `GET /auth/me` with the Bearer token
-
-```bash
-curl -i http://localhost:4000/auth/me \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-Expected `200 OK`:
-
-```json
-{
-  "id": "...",
-  "email": "amjad@example.com",
-  "fullName": "Amjad Mohammed",
-  "phone": null,
-  "role": "CUSTOMER",
-  "isActive": true,
-  "createdAt": "...",
-  "updatedAt": "..."
-}
-```
-
-### 4. Confirm `401 Unauthorized` without a token
-
-```bash
-curl -i http://localhost:4000/auth/me
-```
-
-Expected:
-
-```
-HTTP/1.1 401 Unauthorized
-{"statusCode":401,"message":"Unauthorized"}
-```
-
-Same response for a malformed or expired token.
-
-### 5. Confirm RBAC works — `403 Forbidden` when role is wrong
-
-A freshly registered user has `role = CUSTOMER`. Calling the
-`PLATFORM_ADMIN`-only endpoint should be rejected:
-
-```bash
-curl -i http://localhost:4000/auth/admin-check \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-Expected:
-
-```
-HTTP/1.1 403 Forbidden
-{"statusCode":403,"message":"Insufficient role","error":"Forbidden"}
-```
-
-To see the success path, promote your user in the database, log in again to
-mint a fresh token, and re-call `/auth/admin-check`:
-
-```bash
+# 2. Promote them in the DB
 docker exec -it eventaat-pg psql -U eventaat -d eventaat \
-  -c "UPDATE users SET role='PLATFORM_ADMIN' WHERE email='amjad@example.com';"
+  -c "UPDATE users SET role='PLATFORM_ADMIN' WHERE email='admin@eventaat.com';"
 
-# log in again to get a NEW token that carries the updated role
-TOKEN=$(curl -s -X POST http://localhost:4000/auth/login \
+# 3. Log in to mint a token that carries the new role
+ADMIN_TOKEN=$(curl -s -X POST http://localhost:4000/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin@eventaat.com","password":"supersecret123"}' \
+  | python3 -c "import sys, json; print(json.load(sys.stdin)['accessToken'])")
+```
+
+### Create a restaurant
+
+```bash
+curl -i -X POST http://localhost:4000/restaurants \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "Al Halabi",
+    "description": "Levantine grill in JLT.",
+    "phone": "+97144000000",
+    "address": "Cluster X, JLT",
+    "city": "Dubai",
+    "area": "JLT",
+    "latitude": 25.069,
+    "longitude": 55.140
+  }'
+# → 201 Created
+# {
+#   "id": "...",
+#   "name": "Al Halabi",
+#   ...
+#   "latitude": "25.0690000",      <-- Decimal serializes as string
+#   "longitude": "55.1400000",
+#   "isActive": true,
+#   "createdAt": "...",
+#   "updatedAt": "..."
+# }
+```
+
+> **Note on `Decimal` fields**: Prisma returns `latitude`/`longitude` as
+> `Prisma.Decimal`, which serializes to a JSON **string** to preserve precision.
+> Clients should parse with `Number(...)` if they need a JS number.
+
+### Update a restaurant (e.g., deactivate it)
+
+```bash
+RESTAURANT_ID="<paste-id-from-create-response>"
+
+curl -i -X PATCH "http://localhost:4000/restaurants/$RESTAURANT_ID" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"isActive": false}'
+# → 200 OK
+```
+
+### Non-admin attempting create/update → 403
+
+```bash
+# Get a customer token
+CUSTOMER_TOKEN=$(curl -s -X POST http://localhost:4000/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"email":"amjad@example.com","password":"supersecret123"}' \
   | python3 -c "import sys, json; print(json.load(sys.stdin)['accessToken'])")
 
-curl -i http://localhost:4000/auth/admin-check \
-  -H "Authorization: Bearer $TOKEN"
-# → 200 OK  {"ok":true,"user":{...,"role":"PLATFORM_ADMIN"}}
+curl -i -X POST http://localhost:4000/restaurants \
+  -H "Authorization: Bearer $CUSTOMER_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"X","address":"Y","city":"Z"}'
+# → 403 Forbidden  {"statusCode":403,"message":"Insufficient role",...}
 ```
 
-> The role is encoded in the JWT at login time. After changing a user's role
-> in the DB, they must log in again for the new token to reflect it.
+## Test listing / viewing
+
+```bash
+# As any authenticated user — returns ACTIVE restaurants only
+curl -s http://localhost:4000/restaurants \
+  -H "Authorization: Bearer $CUSTOMER_TOKEN" | python3 -m json.tool
+
+# As PLATFORM_ADMIN — returns ALL restaurants (incl. inactive)
+curl -s http://localhost:4000/restaurants \
+  -H "Authorization: Bearer $ADMIN_TOKEN" | python3 -m json.tool
+
+# Single restaurant — 200 if active or you're admin, 404 otherwise
+curl -i "http://localhost:4000/restaurants/$RESTAURANT_ID" \
+  -H "Authorization: Bearer $CUSTOMER_TOKEN"
+# (after deactivation above) → 404 Not Found
+
+curl -i "http://localhost:4000/restaurants/$RESTAURANT_ID" \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
+# → 200 OK with the (inactive) record
+
+# No token → 401
+curl -i http://localhost:4000/restaurants
+```
+
+Bad UUID in the path:
+
+```bash
+curl -i http://localhost:4000/restaurants/not-a-uuid \
+  -H "Authorization: Bearer $CUSTOMER_TOKEN"
+# → 400 Bad Request from ParseUUIDPipe
+```
 
 ## Scripts
 
@@ -154,5 +164,5 @@ curl -i http://localhost:4000/auth/admin-check \
 | `start`             | Run the compiled server (`node dist/main.js`)                   |
 | `typecheck`         | `tsc --noEmit`                                                  |
 | `prisma:generate`   | Regenerate the Prisma client                                    |
-| `prisma:migrate`    | Run `prisma migrate dev`                                        |
+| `prisma:migrate`    | Run `prisma migrate dev` (applies pending migrations)           |
 | `prisma:studio`     | Open Prisma Studio                                              |

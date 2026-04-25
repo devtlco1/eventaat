@@ -29,3 +29,20 @@ model User {
 
   @@map("users")
 }
+
+model Restaurant {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  description String?
+  phone       String?
+  address     String
+  city        String
+  area        String?
+  latitude    Decimal? @db.Decimal(10, 7)
+  longitude   Decimal? @db.Decimal(10, 7)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("restaurants")
+}
