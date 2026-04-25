@@ -1,14 +1,27 @@
 {
   "name": "@eventaat/admin",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
-  "description": "eventaat admin dashboard (Next.js)",
   "scripts": {
-    "dev": "echo \"Admin not scaffolded yet (later step)\"",
-    "build": "echo \"Admin not scaffolded yet (later step)\"",
-    "typecheck": "echo \"Admin not scaffolded yet (later step)\""
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@eventaat/shared": "*"
+    "next": "16.2.4",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.4",
+    "tailwindcss": "^4",
+    "typescript": "^5"
   }
 }
