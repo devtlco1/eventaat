@@ -44,6 +44,11 @@ export async function apiRequest<T>(
     throw await parseError(res);
   }
 
+  // Some endpoints (e.g. DELETE) return 204 No Content.
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
   return (await res.json()) as T;
 }
 
@@ -212,5 +217,50 @@ export function updateReservationStatus(
       body: JSON.stringify({ status }),
     },
   );
+}
+
+export type RestaurantAdminAssignment = {
+  userId: string;
+  restaurantId: string;
+  assignedAt: string;
+  user: {
+    id: string;
+    email: string;
+    fullName: string;
+    role: 'CUSTOMER' | 'RESTAURANT_ADMIN' | 'PLATFORM_ADMIN';
+  };
+};
+
+export function listRestaurantAdmins(
+  token: string,
+  restaurantId: string,
+): Promise<RestaurantAdminAssignment[]> {
+  return apiRequest<RestaurantAdminAssignment[]>(
+    `/restaurants/${restaurantId}/admins`,
+    { method: 'GET', token },
+  );
+}
+
+export function assignRestaurantAdmin(
+  token: string,
+  restaurantId: string,
+  userId: string,
+): Promise<RestaurantAdminAssignment> {
+  return apiRequest<RestaurantAdminAssignment>(`/restaurants/${restaurantId}/admins`, {
+    method: 'POST',
+    token,
+    body: JSON.stringify({ userId }),
+  });
+}
+
+export async function removeRestaurantAdmin(
+  token: string,
+  restaurantId: string,
+  userId: string,
+): Promise<void> {
+  await apiRequest<unknown>(`/restaurants/${restaurantId}/admins/${userId}`, {
+    method: 'DELETE',
+    token,
+  });
 }
 

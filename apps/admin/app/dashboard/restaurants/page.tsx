@@ -303,6 +303,12 @@ export default function RestaurantsPage() {
                         >
                           Reservations
                         </Link>
+                        <Link
+                          className="text-sm font-medium text-zinc-900 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-500"
+                          href={`/dashboard/restaurants/${r.id}/admins`}
+                        >
+                          Admins
+                        </Link>
                       </div>
                     </td>
                   </tr>
