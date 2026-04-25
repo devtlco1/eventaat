@@ -166,3 +166,51 @@ export function updateRestaurantTable(
   );
 }
 
+export type ReservationStatus =
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'CANCELLED'
+  | 'COMPLETED';
+
+export type RestaurantReservation = {
+  id: string;
+  customerId: string;
+  restaurantId: string;
+  tableId: string;
+  partySize: number;
+  startAt: string;
+  endAt: string;
+  status: ReservationStatus;
+  customerNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+  customer?: Pick<MeResponse, 'id' | 'email' | 'fullName'>;
+  table?: Pick<RestaurantTable, 'id' | 'name' | 'capacity'>;
+};
+
+export function listRestaurantReservations(
+  token: string,
+  restaurantId: string,
+): Promise<RestaurantReservation[]> {
+  return apiRequest<RestaurantReservation[]>(
+    `/restaurants/${restaurantId}/reservations`,
+    { method: 'GET', token },
+  );
+}
+
+export function updateReservationStatus(
+  token: string,
+  restaurantId: string,
+  reservationId: string,
+  status: Exclude<ReservationStatus, 'PENDING'>,
+): Promise<RestaurantReservation> {
+  return apiRequest<RestaurantReservation>(
+    `/restaurants/${restaurantId}/reservations/${reservationId}/status`,
+    {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify({ status }),
+    },
+  );
+}
+
