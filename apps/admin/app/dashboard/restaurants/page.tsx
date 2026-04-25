@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '../../../components/Badge';
 import { Button } from '../../../components/Button';
@@ -288,7 +289,14 @@ export default function RestaurantsPage() {
                         {r.isActive ? 'Active' : 'Inactive'}
                       </Badge>
                     </td>
-                    <td className="px-6 py-4 text-zinc-500">—</td>
+                    <td className="px-6 py-4">
+                      <Link
+                        className="text-sm font-medium text-zinc-900 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-500"
+                        href={`/dashboard/restaurants/${r.id}/tables`}
+                      >
+                        Tables
+                      </Link>
+                    </td>
                   </tr>
                 ))
               )}

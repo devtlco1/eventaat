@@ -113,3 +113,56 @@ export function createRestaurant(
   });
 }
 
+export type RestaurantTable = {
+  id: string;
+  restaurantId: string;
+  name: string;
+  capacity: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function listRestaurantTables(
+  token: string,
+  restaurantId: string,
+): Promise<RestaurantTable[]> {
+  return apiRequest<RestaurantTable[]>(
+    `/restaurants/${restaurantId}/tables`,
+    { method: 'GET', token },
+  );
+}
+
+export type CreateRestaurantTableInput = {
+  name: string;
+  capacity: number;
+};
+
+export function createRestaurantTable(
+  token: string,
+  restaurantId: string,
+  input: CreateRestaurantTableInput,
+): Promise<RestaurantTable> {
+  return apiRequest<RestaurantTable>(`/restaurants/${restaurantId}/tables`, {
+    method: 'POST',
+    token,
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateRestaurantTable(
+  token: string,
+  restaurantId: string,
+  tableId: string,
+  data: { name?: string; capacity?: number; isActive?: boolean },
+): Promise<RestaurantTable> {
+  return apiRequest<RestaurantTable>(
+    `/restaurants/${restaurantId}/tables/${tableId}`,
+    {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify(data),
+    },
+  );
+}
+
