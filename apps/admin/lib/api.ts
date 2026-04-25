@@ -264,3 +264,53 @@ export async function removeRestaurantAdmin(
   });
 }
 
+export type UserRole = MeResponse['role'];
+
+export type PlatformUser = {
+  id: string;
+  email: string;
+  fullName: string;
+  phone: string | null;
+  role: UserRole;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function listUsers(
+  token: string,
+  filters: { role?: UserRole; isActive?: boolean } = {},
+): Promise<PlatformUser[]> {
+  const params = new URLSearchParams();
+  if (filters.role) params.set('role', filters.role);
+  if (typeof filters.isActive === 'boolean') {
+    params.set('isActive', String(filters.isActive));
+  }
+  const qs = params.toString();
+  return apiRequest<PlatformUser[]>(`/users${qs ? `?${qs}` : ''}`, {
+    method: 'GET',
+    token,
+  });
+}
+
+export function getUser(token: string, id: string): Promise<PlatformUser> {
+  return apiRequest<PlatformUser>(`/users/${id}`, { method: 'GET', token });
+}
+
+export function updateUser(
+  token: string,
+  id: string,
+  input: {
+    fullName?: string;
+    phone?: string;
+    role?: UserRole;
+    isActive?: boolean;
+  },
+): Promise<PlatformUser> {
+  return apiRequest<PlatformUser>(`/users/${id}`, {
+    method: 'PATCH',
+    token,
+    body: JSON.stringify(input),
+  });
+}
+

@@ -37,6 +37,7 @@ export default function DashboardLayout({
             <nav className="hidden items-center gap-1 sm:flex">
               <NavLink href="/dashboard" label="Dashboard" />
               <NavLink href="/dashboard/restaurants" label="Restaurants" />
+              <NavLink href="/dashboard/users" label="Users" />
             </nav>
           </div>
 
@@ -46,6 +47,9 @@ export default function DashboardLayout({
             </div>
             <div className="sm:hidden">
               <NavLink href="/dashboard/restaurants" label="Restaurants" />
+            </div>
+            <div className="sm:hidden">
+              <NavLink href="/dashboard/users" label="Users" />
             </div>
             <Button variant="secondary" onClick={logout}>
               Logout
