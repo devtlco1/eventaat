@@ -51,6 +51,14 @@ export interface AvailabilityResponse {
   slots: AvailabilitySlot[];
 }
 
+export type ReservationStatus =
+  | 'PENDING'
+  | 'HELD'
+  | 'CONFIRMED'
+  | 'REJECTED'
+  | 'CANCELLED'
+  | 'COMPLETED';
+
 export type GuestType = 'FAMILY' | 'YOUTH' | 'MIXED' | 'BUSINESS' | 'OTHER';
 export type SeatingPreference = 'INDOOR' | 'OUTDOOR' | 'NO_PREFERENCE';
 export type BookingType =
@@ -81,7 +89,7 @@ export type ReservationRecord = {
   partySize: number;
   startAt: string;
   endAt: string;
-  status: string;
+  status: ReservationStatus;
   guestType: GuestType;
   seatingPreference: SeatingPreference;
   bookingType: BookingType;

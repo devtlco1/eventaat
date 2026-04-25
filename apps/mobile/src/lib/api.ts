@@ -136,3 +136,23 @@ export async function createReservationRequest(
   }
   return res.json() as Promise<ReservationRecord>;
 }
+
+export async function fetchMyReservations(
+  accessToken: string,
+): Promise<ReservationRecord[]> {
+  const res = await fetch(`${baseUrl()}/me/reservations`, {
+    method: 'GET',
+    headers: authHeaders(accessToken),
+  });
+  if (res.status === 401) {
+    throw new Error('Unauthorized (401) — sign in again.');
+  }
+  if (!res.ok) {
+    const message = await readErrorMessage(
+      res,
+      `Could not load reservations (${res.status})`,
+    );
+    throw new Error(message);
+  }
+  return res.json() as Promise<ReservationRecord[]>;
+}

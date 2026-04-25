@@ -73,7 +73,7 @@ export function RootNavigator() {
           <Stack.Screen
             name="Reservations"
             component={ReservationsScreen}
-            options={{ title: 'Reservations' }}
+            options={{ title: 'My reservations' }}
           />
         </>
       )}
