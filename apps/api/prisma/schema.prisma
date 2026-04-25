@@ -16,6 +16,13 @@ enum Role {
   PLATFORM_ADMIN
 }
 
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
@@ -28,6 +35,7 @@ model User {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   restaurantAssignments RestaurantAdmin[]
+  reservations          Reservation[]
 
   @@map("users")
 }
@@ -48,6 +56,7 @@ model Restaurant {
 
   admins RestaurantAdmin[]
   tables RestaurantTable[]
+  reservations Reservation[]
 
   @@map("restaurants")
 }
@@ -62,8 +71,32 @@ model RestaurantTable {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  reservations Reservation[]
 
   @@map("restaurant_tables")
+}
+
+model Reservation {
+  id           String            @id @default(uuid()) @db.Uuid
+  customerId   String            @map("customer_id") @db.Uuid
+  restaurantId String            @map("restaurant_id") @db.Uuid
+  tableId      String            @map("table_id") @db.Uuid
+  partySize    Int               @map("party_size")
+  startAt      DateTime          @map("start_at")
+  endAt        DateTime          @map("end_at")
+  status       ReservationStatus @default(PENDING)
+  customerNote String?           @map("customer_note")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  customer   User           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  restaurant Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  table      RestaurantTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([tableId, startAt, endAt])
+  @@index([customerId])
+  @@map("reservations")
 }
 
 /// Join table that links a RESTAURANT_ADMIN user to one or more restaurants.

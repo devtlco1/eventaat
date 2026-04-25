@@ -11,15 +11,22 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { Restaurant, RestaurantAdmin, RestaurantTable } from '@prisma/client';
+import {
+  Restaurant,
+  RestaurantAdmin,
+  Reservation,
+  RestaurantTable,
+} from '@prisma/client';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { SafeUser } from '../users/users.service';
 import { AssignAdminDto } from './dto/assign-admin.dto';
+import { CreateReservationDto } from './dto/create-reservation.dto';
 import { CreateRestaurantDto } from './dto/create-restaurant.dto';
 import { CreateRestaurantTableDto } from './dto/create-restaurant-table.dto';
+import { UpdateReservationStatusDto } from './dto/update-reservation-status.dto';
 import { UpdateRestaurantDto } from './dto/update-restaurant.dto';
 import { UpdateRestaurantTableDto } from './dto/update-restaurant-table.dto';
 import { RestaurantsService } from './restaurants.service';
@@ -163,5 +170,55 @@ export class RestaurantsController {
     @CurrentUser() user: SafeUser,
   ): Promise<RestaurantTable> {
     return this.restaurants.updateTable(restaurantId, tableId, dto, user);
+  }
+
+  // ─── Reservations ──────────────────────────────────────────────────────────
+
+  /**
+   * POST /restaurants/:restaurantId/reservations
+   * CUSTOMER only — creates PENDING reservation.
+   */
+  @Post(':restaurantId/reservations')
+  @Roles('CUSTOMER')
+  createReservation(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @Body() dto: CreateReservationDto,
+    @CurrentUser() user: SafeUser,
+  ): Promise<Reservation> {
+    return this.restaurants.createReservation(restaurantId, dto, user);
+  }
+
+  /**
+   * GET /restaurants/:restaurantId/reservations
+   * PLATFORM_ADMIN: any restaurant
+   * RESTAURANT_ADMIN: assigned restaurants only
+   */
+  @Get(':restaurantId/reservations')
+  @Roles('PLATFORM_ADMIN', 'RESTAURANT_ADMIN')
+  listRestaurantReservations(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @CurrentUser() user: SafeUser,
+  ) {
+    return this.restaurants.listRestaurantReservations(restaurantId, user);
+  }
+
+  /**
+   * PATCH /restaurants/:restaurantId/reservations/:reservationId/status
+   * Allowed statuses: CONFIRMED | CANCELLED | COMPLETED
+   */
+  @Patch(':restaurantId/reservations/:reservationId/status')
+  @Roles('PLATFORM_ADMIN', 'RESTAURANT_ADMIN')
+  updateReservationStatus(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @Param('reservationId', new ParseUUIDPipe()) reservationId: string,
+    @Body() dto: UpdateReservationStatusDto,
+    @CurrentUser() user: SafeUser,
+  ): Promise<Reservation> {
+    return this.restaurants.updateReservationStatus(
+      restaurantId,
+      reservationId,
+      dto,
+      user,
+    );
   }
 }
