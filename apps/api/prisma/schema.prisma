@@ -27,6 +27,8 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
+  restaurantAssignments RestaurantAdmin[]
+
   @@map("users")
 }
 
@@ -44,5 +46,22 @@ model Restaurant {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  admins RestaurantAdmin[]
+
   @@map("restaurants")
+}
+
+/// Join table that links a RESTAURANT_ADMIN user to one or more restaurants.
+/// One user can manage multiple restaurants; one restaurant can have multiple admins.
+model RestaurantAdmin {
+  userId       String @map("user_id") @db.Uuid
+  restaurantId String @map("restaurant_id") @db.Uuid
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  @@id([userId, restaurantId])
+  @@map("restaurant_admins")
 }
