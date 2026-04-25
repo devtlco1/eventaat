@@ -1,9 +1,20 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Role, User } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 /** A User stripped of secrets — safe to return from the API. */
 export type SafeUser = Omit<User, 'passwordHash'>;
+
+const SAFE_USER_SELECT = {
+  id: true,
+  email: true,
+  fullName: true,
+  phone: true,
+  role: true,
+  isActive: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
 
 @Injectable()
 export class UsersService {
@@ -15,6 +26,52 @@ export class UsersService {
 
   findById(id: string): Promise<User | null> {
     return this.prisma.user.findUnique({ where: { id } });
+  }
+
+  async findSafeById(id: string): Promise<SafeUser> {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: SAFE_USER_SELECT,
+    });
+    if (!user) throw new NotFoundException('User not found');
+    return user;
+  }
+
+  list(filters: { role?: Role; isActive?: boolean } = {}): Promise<SafeUser[]> {
+    return this.prisma.user.findMany({
+      where: {
+        ...(filters.role ? { role: filters.role } : {}),
+        ...(typeof filters.isActive === 'boolean'
+          ? { isActive: filters.isActive }
+          : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      select: SAFE_USER_SELECT,
+    });
+  }
+
+  async update(
+    id: string,
+    data: {
+      fullName?: string;
+      phone?: string | null;
+      role?: Role;
+      isActive?: boolean;
+    },
+  ): Promise<SafeUser> {
+    try {
+      return await this.prisma.user.update({
+        where: { id },
+        data,
+        select: SAFE_USER_SELECT,
+      });
+    } catch (err) {
+      // Prisma P2025: Record to update not found.
+      if (typeof err === 'object' && err && 'code' in err && (err as any).code === 'P2025') {
+        throw new NotFoundException('User not found');
+      }
+      throw err;
+    }
   }
 
   create(input: {
