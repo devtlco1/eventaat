@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -22,6 +23,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { SafeUser } from '../users/users.service';
+import { AvailabilityQueryDto } from './dto/availability-query.dto';
 import { AssignAdminDto } from './dto/assign-admin.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { CreateRestaurantDto } from './dto/create-restaurant.dto';
@@ -52,6 +54,18 @@ export class RestaurantsController {
   @Get()
   list(@CurrentUser() user: SafeUser): Promise<Restaurant[]> {
     return this.restaurants.list(user);
+  }
+
+  /**
+   * GET /restaurants/:restaurantId/availability
+   * Any authenticated user can query availability (CUSTOMER/RESTAURANT_ADMIN/PLATFORM_ADMIN).
+   */
+  @Get(':restaurantId/availability')
+  availability(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @Query() query: AvailabilityQueryDto,
+  ) {
+    return this.restaurants.getAvailability(restaurantId, query);
   }
 
   @Get(':id')

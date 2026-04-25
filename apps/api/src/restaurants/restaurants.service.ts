@@ -16,6 +16,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SafeUser } from '../users/users.service';
+import { AvailabilityQueryDto } from './dto/availability-query.dto';
 import { CreateRestaurantDto } from './dto/create-restaurant.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { CreateRestaurantTableDto } from './dto/create-restaurant-table.dto';
@@ -501,5 +502,133 @@ export class RestaurantsService {
       where: { id: reservationId },
       data: { status: dto.status },
     });
+  }
+
+  // ─── Availability ─────────────────────────────────────────────────────────
+
+  async getAvailability(
+    restaurantId: string,
+    query: AvailabilityQueryDto,
+  ): Promise<{
+    restaurantId: string;
+    date: string;
+    partySize: number;
+    durationMinutes: number;
+    slots: Array<{
+      startAt: string;
+      endAt: string;
+      tables: Array<{ id: string; name: string; capacity: number }>;
+    }>;
+  }> {
+    const durationMinutes = query.durationMinutes ?? 90;
+
+    // Restaurant must exist and be active for availability.
+    const restaurant = await this.prisma.restaurant.findUnique({
+      where: { id: restaurantId },
+      select: { id: true, isActive: true },
+    });
+    if (!restaurant || !restaurant.isActive) {
+      throw new NotFoundException('Restaurant not found');
+    }
+
+    const [y, m, d] = query.date.split('-').map((x) => Number(x));
+    if (!y || !m || !d) {
+      throw new UnprocessableEntityException('Invalid date');
+    }
+
+    // Operating hours: 12:00 -> 23:00 in server local time.
+    const openAt = new Date(y, m - 1, d, 12, 0, 0, 0);
+    const closeAt = new Date(y, m - 1, d, 23, 0, 0, 0);
+    if (isNaN(openAt.getTime()) || isNaN(closeAt.getTime())) {
+      throw new UnprocessableEntityException('Invalid date');
+    }
+
+    const tables = await this.prisma.restaurantTable.findMany({
+      where: {
+        restaurantId,
+        isActive: true,
+        capacity: { gte: query.partySize },
+      },
+      select: { id: true, name: true, capacity: true },
+      orderBy: [{ capacity: 'asc' }, { createdAt: 'asc' }],
+    });
+
+    if (tables.length === 0) {
+      return {
+        restaurantId,
+        date: query.date,
+        partySize: query.partySize,
+        durationMinutes,
+        slots: [],
+      };
+    }
+
+    const relevantReservations = await this.prisma.reservation.findMany({
+      where: {
+        restaurantId,
+        tableId: { in: tables.map((t) => t.id) },
+        status: { in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED] },
+        startAt: { lt: closeAt },
+        endAt: { gt: openAt },
+      },
+      select: { tableId: true, startAt: true, endAt: true },
+    });
+
+    const reservationsByTable = new Map<
+      string,
+      Array<{ startAt: Date; endAt: Date }>
+    >();
+    for (const r of relevantReservations) {
+      const arr = reservationsByTable.get(r.tableId) ?? [];
+      arr.push({ startAt: r.startAt, endAt: r.endAt });
+      reservationsByTable.set(r.tableId, arr);
+    }
+
+    const slots: Array<{
+      startAt: string;
+      endAt: string;
+      tables: Array<{ id: string; name: string; capacity: number }>;
+    }> = [];
+
+    const intervalMs = 30 * 60 * 1000;
+    const durationMs = durationMinutes * 60 * 1000;
+
+    for (
+      let start = openAt.getTime();
+      start + durationMs <= closeAt.getTime();
+      start += intervalMs
+    ) {
+      const slotStart = new Date(start);
+      const slotEnd = new Date(start + durationMs);
+
+      const availableTables = tables.filter((t) => {
+        const reservations = reservationsByTable.get(t.id) ?? [];
+        for (const res of reservations) {
+          // Overlap if res.start < slotEnd && res.end > slotStart
+          if (res.startAt.getTime() < slotEnd.getTime()) {
+            if (res.endAt.getTime() > slotStart.getTime()) {
+              return false;
+            }
+          }
+        }
+        return true;
+      });
+
+      if (availableTables.length === 0) continue;
+
+      slots.push({
+        startAt: slotStart.toISOString(),
+        endAt: slotEnd.toISOString(),
+        tables: availableTables,
+      });
+    }
+
+    return {
+      restaurantId,
+      date: query.date,
+      partySize: query.partySize,
+      durationMinutes,
+      slots,
+    };
   }
 }
