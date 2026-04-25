@@ -227,7 +227,7 @@ export class RestaurantsController {
     @Param('reservationId', new ParseUUIDPipe()) reservationId: string,
     @Body() dto: UpdateReservationStatusDto,
     @CurrentUser() user: SafeUser,
-  ): Promise<Reservation> {
+  ) {
     return this.restaurants.updateReservationStatus(
       restaurantId,
       reservationId,

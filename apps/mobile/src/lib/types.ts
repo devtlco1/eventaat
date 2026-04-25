@@ -99,3 +99,14 @@ export type ReservationRecord = {
   createdAt: string;
   updatedAt: string;
 };
+
+/** Response from GET /me/reservations (includes restaurant + table when set). */
+export type MyReservation = ReservationRecord & {
+  restaurant: {
+    id: string;
+    name: string;
+    city: string;
+    area: string | null;
+  };
+  table: { id: string; name: string; capacity: number } | null;
+};

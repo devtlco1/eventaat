@@ -12,8 +12,8 @@ import {
 } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
-import { fetchMyReservations, fetchRestaurants } from '../lib/api';
-import type { ReservationRecord, ReservationStatus, Restaurant } from '../lib/types';
+import { fetchMyReservations } from '../lib/api';
+import type { MyReservation, ReservationStatus } from '../lib/types';
 import { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Reservations'>;
@@ -30,14 +30,19 @@ const STATUS_BADGE: Record<
   COMPLETED: { bg: '#ecfdf5', text: '#047857', label: 'COMPLETED' },
 };
 
-function formatWhen(iso: string): string {
+function formatWhereWhen(startIso: string, endIso: string): string {
   try {
-    return new Date(iso).toLocaleString(undefined, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    });
+    const s = new Date(startIso);
+    const e = new Date(endIso);
+    if (isNaN(s.getTime()) || isNaN(e.getTime())) {
+      return `${startIso} – ${endIso}`;
+    }
+    const dateLine = s.toLocaleDateString(undefined, { dateStyle: 'medium' });
+    const t1 = s.toLocaleTimeString(undefined, { timeStyle: 'short' });
+    const t2 = e.toLocaleTimeString(undefined, { timeStyle: 'short' });
+    return `${dateLine} · ${t1} – ${t2}`;
   } catch {
-    return iso;
+    return `${startIso} – ${endIso}`;
   }
 }
 
@@ -49,10 +54,17 @@ function displayBooking(s: string): string {
   return s.replace(/_/g, ' ');
 }
 
+function placeSubtitle(r: MyReservation): string {
+  const p = r.restaurant;
+  if (p.area) {
+    return `${p.city} · ${p.area}`;
+  }
+  return p.city;
+}
+
 export function ReservationsScreen(_props: Props) {
   const { token, signOut } = useAuth();
-  const [reservations, setReservations] = useState<ReservationRecord[]>([]);
-  const [nameById, setNameById] = useState<Record<string, string>>({});
+  const [reservations, setReservations] = useState<MyReservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,16 +79,8 @@ export function ReservationsScreen(_props: Props) {
       }
       setError(null);
       try {
-        const [list, restaurants] = await Promise.all([
-          fetchMyReservations(token),
-          fetchRestaurants(token).catch((): Restaurant[] => []),
-        ]);
+        const list = await fetchMyReservations(token);
         setReservations(list);
-        const map: Record<string, string> = {};
-        for (const r of restaurants) {
-          map[r.id] = r.name;
-        }
-        setNameById(map);
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'Something went wrong';
         if (msg.includes('401')) {
@@ -104,67 +108,48 @@ export function ReservationsScreen(_props: Props) {
     void load(true);
   }, [load]);
 
-  const renderItem: ListRenderItem<ReservationRecord> = useCallback(
-    ({ item: r }) => {
-      const st = r.status as ReservationStatus;
-      const badge = STATUS_BADGE[st] ?? {
-        bg: '#f4f4f5',
-        text: '#3f3f46',
-        label: r.status,
-      };
-      const placeName =
-        nameById[r.restaurantId] ??
-        (r as { restaurantName?: string | null }).restaurantName ??
-        null;
-
-      return (
-        <View style={styles.card} accessibilityLabel={`Reservation ${r.status}`}>
-          <View style={styles.cardHeader}>
-            {placeName ? (
-              <Text style={styles.placeName}>{placeName}</Text>
-            ) : (
-              <Text style={styles.placeNameMuted}>Restaurant</Text>
-            )}
-            <View style={[styles.badge, { backgroundColor: badge.bg }]}>
-              <Text style={[styles.badgeText, { color: badge.text }]}>{badge.label}</Text>
-            </View>
+  const renderItem: ListRenderItem<MyReservation> = useCallback(({ item: r }) => {
+    const st = r.status;
+    const badge = STATUS_BADGE[st] ?? {
+      bg: '#f4f4f5',
+      text: '#3f3f46',
+      label: r.status,
+    };
+    const name = r.restaurant.name;
+    const loc = placeSubtitle(r);
+    return (
+      <View style={styles.card} accessibilityLabel={`Reservation ${r.status}`}>
+        <View style={styles.cardHeader}>
+          <View style={styles.titleBlock}>
+            <Text style={styles.placeName}>{name}</Text>
+            {loc ? <Text style={styles.placeLoc}>{loc}</Text> : null}
           </View>
-          {placeName == null ? <Text style={styles.meta}>{r.restaurantId}</Text> : null}
-          <View style={styles.row}>
-            <Text style={styles.k}>Party</Text>
-            <Text style={styles.v}>{r.partySize}</Text>
+          <View style={[styles.badge, { backgroundColor: badge.bg }]}>
+            <Text style={[styles.badgeText, { color: badge.text }]}>{badge.label}</Text>
           </View>
-          <View style={styles.row}>
-            <Text style={styles.k}>Start</Text>
-            <Text style={styles.v}>{formatWhen(r.startAt)}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.k}>End</Text>
-            <Text style={styles.v}>{formatWhen(r.endAt)}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.k}>Guest</Text>
-            <Text style={styles.v}>{r.guestType}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.k}>Seating</Text>
-            <Text style={styles.v}>{displaySeating(r.seatingPreference)}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.k}>Type</Text>
-            <Text style={styles.v}>{displayBooking(r.bookingType)}</Text>
-          </View>
-          {r.specialRequest ? (
-            <View style={styles.noteBlock}>
-              <Text style={styles.k}>Request</Text>
-              <Text style={styles.note}>{r.specialRequest}</Text>
-            </View>
-          ) : null}
         </View>
-      );
-    },
-    [nameById],
-  );
+        <Text style={styles.whenText}>{formatWhereWhen(r.startAt, r.endAt)}</Text>
+        <View style={styles.row}>
+          <Text style={styles.k}>Guest type</Text>
+          <Text style={styles.v}>{r.guestType}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.k}>Seating</Text>
+          <Text style={styles.v}>{displaySeating(r.seatingPreference)}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.k}>Booking</Text>
+          <Text style={styles.v}>{displayBooking(r.bookingType)}</Text>
+        </View>
+        {r.specialRequest ? (
+          <View style={styles.noteBlock}>
+            <Text style={styles.k}>Request</Text>
+            <Text style={styles.note}>{r.specialRequest}</Text>
+          </View>
+        ) : null}
+      </View>
+    );
+  }, []);
 
   if (loading && !refreshing) {
     return (
@@ -253,19 +238,20 @@ const styles = StyleSheet.create({
   },
   cardHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 6,
   },
-  placeName: { fontSize: 18, fontWeight: '700', color: '#0f172a', flex: 1, flexWrap: 'wrap' },
-  placeNameMuted: { fontSize: 16, fontWeight: '600', color: '#94a3b8', flex: 1 },
-  meta: { fontSize: 12, color: '#94a3b8', marginBottom: 8 },
+  titleBlock: { flex: 1 },
+  placeName: { fontSize: 18, fontWeight: '700', color: '#0f172a' },
+  placeLoc: { marginTop: 4, fontSize: 14, color: '#64748b' },
+  whenText: { fontSize: 15, color: '#334155', marginBottom: 10 },
   row: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, gap: 12 },
   k: { fontSize: 13, color: '#64748b', fontWeight: '600' },
   v: { fontSize: 15, color: '#334155', textAlign: 'right', flex: 1, flexWrap: 'wrap' },
   noteBlock: { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
   note: { marginTop: 4, fontSize: 15, color: '#334155', lineHeight: 22 },
-  badge: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 6 },
+  badge: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 6, alignSelf: 'flex-start' },
   badgeText: { fontSize: 11, fontWeight: '700' },
 });

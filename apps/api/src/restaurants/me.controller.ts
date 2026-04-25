@@ -1,5 +1,4 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
-import { Reservation } from '@prisma/client';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -14,7 +13,7 @@ export class MeController {
 
   @Get('reservations')
   @Roles('CUSTOMER')
-  listMyReservations(@CurrentUser() user: SafeUser): Promise<Reservation[]> {
+  listMyReservations(@CurrentUser() user: SafeUser) {
     return this.restaurants.listMyReservations(user);
   }
 }

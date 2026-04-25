@@ -221,11 +221,10 @@ export default function RestaurantReservationsPage() {
                   const customerLabel =
                     r.customer?.email ?? r.customerId;
                   const customerName = r.customer?.fullName;
+                  const customerPhone = r.customer?.phone;
                   const tableLabel = r.table
                     ? r.table.name
-                    : r.tableId
-                      ? r.tableId
-                      : '—';
+                    : 'Request only';
 
                   return (
                     <tr key={r.id} className="hover:bg-zinc-50/50">
@@ -235,6 +234,9 @@ export default function RestaurantReservationsPage() {
                         </div>
                         {customerName ? (
                           <div className="text-xs text-zinc-500">{customerName}</div>
+                        ) : null}
+                        {customerPhone ? (
+                          <div className="text-xs text-zinc-500">{customerPhone}</div>
                         ) : null}
                       </td>
                       <td className="px-6 py-4 text-zinc-700">{tableLabel}</td>

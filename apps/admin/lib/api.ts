@@ -207,8 +207,13 @@ export type RestaurantReservation = {
   specialRequest: string | null;
   createdAt: string;
   updatedAt: string;
-  customer?: Pick<MeResponse, 'id' | 'email' | 'fullName'>;
-  table?: Pick<RestaurantTable, 'id' | 'name' | 'capacity'>;
+  customer: {
+    id: string;
+    email: string;
+    fullName: string;
+    phone: string | null;
+  };
+  table: Pick<RestaurantTable, 'id' | 'name' | 'capacity'> | null;
 };
 
 export function listRestaurantReservations(

@@ -2,6 +2,7 @@ import type {
   AuthLoginResponse,
   AvailabilityResponse,
   CreateReservationRequestBody,
+  MyReservation,
   ReservationRecord,
   Restaurant,
   RestaurantDetail,
@@ -139,7 +140,7 @@ export async function createReservationRequest(
 
 export async function fetchMyReservations(
   accessToken: string,
-): Promise<ReservationRecord[]> {
+): Promise<MyReservation[]> {
   const res = await fetch(`${baseUrl()}/me/reservations`, {
     method: 'GET',
     headers: authHeaders(accessToken),
@@ -154,5 +155,5 @@ export async function fetchMyReservations(
     );
     throw new Error(message);
   }
-  return res.json() as Promise<ReservationRecord[]>;
+  return res.json() as Promise<MyReservation[]>;
 }

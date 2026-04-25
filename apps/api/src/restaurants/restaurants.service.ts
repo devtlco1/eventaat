@@ -445,7 +445,16 @@ export class RestaurantsService {
     });
   }
 
-  listMyReservations(customer: SafeUser): Promise<Reservation[]> {
+  listMyReservations(
+    customer: SafeUser,
+  ): Promise<
+    Prisma.ReservationGetPayload<{
+      include: {
+        restaurant: { select: { id: true; name: true; city: true; area: true } };
+        table: { select: { id: true; name: true; capacity: true } };
+      };
+    }>[]
+  > {
     if (customer.role !== Role.CUSTOMER) {
       throw new ForbiddenException('Only customers can view this endpoint');
     }
@@ -453,6 +462,10 @@ export class RestaurantsService {
     return this.prisma.reservation.findMany({
       where: { customerId: customer.id },
       orderBy: { startAt: 'desc' },
+      include: {
+        restaurant: { select: { id: true, name: true, city: true, area: true } },
+        table: { select: { id: true, name: true, capacity: true } },
+      },
     });
   }
 
@@ -460,17 +473,17 @@ export class RestaurantsService {
     restaurantId: string,
     viewer: SafeUser,
   ): Promise<
-    Array<
-      Reservation & {
-        customer: SafeUser;
-        table: RestaurantTable | null;
-      }
-    >
+    Prisma.ReservationGetPayload<{
+      include: {
+        customer: { select: { id: true; email: true; fullName: true; phone: true } };
+        table: { select: { id: true; name: true; capacity: true } };
+      };
+    }>[]
   > {
     await this.assertRestaurantExists(restaurantId);
     await this.assertCanManageRestaurant(viewer, restaurantId);
 
-    const rows = await this.prisma.reservation.findMany({
+    return this.prisma.reservation.findMany({
       where: { restaurantId },
       include: {
         customer: {
@@ -479,23 +492,12 @@ export class RestaurantsService {
             email: true,
             fullName: true,
             phone: true,
-            role: true,
-            isActive: true,
-            createdAt: true,
-            updatedAt: true,
           },
         },
-        table: true,
+        table: { select: { id: true, name: true, capacity: true } },
       },
       orderBy: { startAt: 'desc' },
     });
-
-    return rows as Array<
-      Reservation & {
-        customer: SafeUser;
-        table: RestaurantTable | null;
-      }
-    >;
   }
 
   async updateReservationStatus(
@@ -503,7 +505,14 @@ export class RestaurantsService {
     reservationId: string,
     dto: UpdateReservationStatusDto,
     actor: SafeUser,
-  ): Promise<Reservation> {
+  ): Promise<
+    Prisma.ReservationGetPayload<{
+      include: {
+        customer: { select: { id: true; email: true; fullName: true; phone: true } };
+        table: { select: { id: true; name: true; capacity: true } };
+      };
+    }>
+  > {
     await this.assertRestaurantExists(restaurantId);
     await this.assertCanManageRestaurant(actor, restaurantId);
 
@@ -518,6 +527,12 @@ export class RestaurantsService {
     return this.prisma.reservation.update({
       where: { id: reservationId },
       data: { status: dto.status },
+      include: {
+        customer: {
+          select: { id: true, email: true, fullName: true, phone: true },
+        },
+        table: { select: { id: true, name: true, capacity: true } },
+      },
     });
   }
 
