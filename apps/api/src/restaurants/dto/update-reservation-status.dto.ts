@@ -1,5 +1,5 @@
 import { ReservationStatus } from '@prisma/client';
-import { IsIn } from 'class-validator';
+import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 
 const ALLOWED: ReservationStatus[] = [
   ReservationStatus.HELD,
@@ -12,4 +12,9 @@ const ALLOWED: ReservationStatus[] = [
 export class UpdateReservationStatusDto {
   @IsIn(ALLOWED)
   status!: ReservationStatus;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  note?: string;
 }

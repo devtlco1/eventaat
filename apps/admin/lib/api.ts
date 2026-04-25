@@ -214,6 +214,22 @@ export type RestaurantReservation = {
     phone: string | null;
   };
   table: Pick<RestaurantTable, 'id' | 'name' | 'capacity'> | null;
+  statusHistory?: RestaurantReservationHistoryEntry[];
+};
+
+export type RestaurantReservationHistoryEntry = {
+  id: string;
+  reservationId: string;
+  changedByUserId: string | null;
+  fromStatus: ReservationStatus | null;
+  toStatus: ReservationStatus;
+  note: string | null;
+  createdAt: string;
+  changedBy: {
+    id: string;
+    fullName: string;
+    email: string;
+  } | null;
 };
 
 export function listRestaurantReservations(
@@ -231,13 +247,14 @@ export function updateReservationStatus(
   restaurantId: string,
   reservationId: string,
   status: AdminReservationStatus,
+  note?: string,
 ): Promise<RestaurantReservation> {
   return apiRequest<RestaurantReservation>(
     `/restaurants/${restaurantId}/reservations/${reservationId}/status`,
     {
       method: 'PATCH',
       token,
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, ...(note ? { note } : {}) }),
     },
   );
 }

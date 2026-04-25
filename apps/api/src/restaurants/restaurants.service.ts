@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -26,6 +27,42 @@ import { UpdateRestaurantTableDto } from './dto/update-restaurant-table.dto';
 
 @Injectable()
 export class RestaurantsService {
+  private static readonly TERMINAL: ReservationStatus[] = [
+    ReservationStatus.REJECTED,
+    ReservationStatus.CANCELLED,
+    ReservationStatus.COMPLETED,
+  ];
+
+  private isAllowedStatusTransition(
+    from: ReservationStatus,
+    to: ReservationStatus,
+  ): boolean {
+    if (from === to) {
+      return false;
+    }
+    if (RestaurantsService.TERMINAL.includes(from)) {
+      return false;
+    }
+    const next: ReservationStatus[] =
+      from === ReservationStatus.PENDING
+        ? [
+            ReservationStatus.HELD,
+            ReservationStatus.CONFIRMED,
+            ReservationStatus.REJECTED,
+            ReservationStatus.CANCELLED,
+          ]
+        : from === ReservationStatus.HELD
+          ? [
+              ReservationStatus.CONFIRMED,
+              ReservationStatus.REJECTED,
+              ReservationStatus.CANCELLED,
+            ]
+          : from === ReservationStatus.CONFIRMED
+            ? [ReservationStatus.CANCELLED, ReservationStatus.COMPLETED]
+            : [];
+    return next.includes(to);
+  }
+
   constructor(private readonly prisma: PrismaService) {}
 
   // ─── Core CRUD ────────────────────────────────────────────────────────────
@@ -426,22 +463,34 @@ export class RestaurantsService {
       tableId = table.id;
     }
 
-    return this.prisma.reservation.create({
-      data: {
-        customerId: customer.id,
-        restaurantId,
-        tableId,
-        partySize: dto.partySize,
-        startAt,
-        endAt,
-        status: ReservationStatus.PENDING,
-        guestType: dto.guestType,
-        seatingPreference: dto.seatingPreference,
-        bookingType: dto.bookingType,
-        occasionNote: dto.occasionNote,
-        customerPhone: dto.customerPhone,
-        specialRequest: dto.specialRequest,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const created = await tx.reservation.create({
+        data: {
+          customerId: customer.id,
+          restaurantId,
+          tableId,
+          partySize: dto.partySize,
+          startAt,
+          endAt,
+          status: ReservationStatus.PENDING,
+          guestType: dto.guestType,
+          seatingPreference: dto.seatingPreference,
+          bookingType: dto.bookingType,
+          occasionNote: dto.occasionNote,
+          customerPhone: dto.customerPhone,
+          specialRequest: dto.specialRequest,
+        },
+      });
+      await tx.reservationStatusHistory.create({
+        data: {
+          reservationId: created.id,
+          changedByUserId: customer.id,
+          fromStatus: null,
+          toStatus: ReservationStatus.PENDING,
+          note: 'Reservation request submitted',
+        },
+      });
+      return created;
     });
   }
 
@@ -452,6 +501,10 @@ export class RestaurantsService {
       include: {
         restaurant: { select: { id: true; name: true; city: true; area: true } };
         table: { select: { id: true; name: true; capacity: true } };
+        statusHistory: {
+          orderBy: { createdAt: 'asc' };
+          select: { fromStatus: true; toStatus: true; note: true; createdAt: true };
+        };
       };
     }>[]
   > {
@@ -465,6 +518,15 @@ export class RestaurantsService {
       include: {
         restaurant: { select: { id: true, name: true, city: true, area: true } },
         table: { select: { id: true, name: true, capacity: true } },
+        statusHistory: {
+          orderBy: { createdAt: 'asc' },
+          select: {
+            fromStatus: true,
+            toStatus: true,
+            note: true,
+            createdAt: true,
+          },
+        },
       },
     });
   }
@@ -477,6 +539,12 @@ export class RestaurantsService {
       include: {
         customer: { select: { id: true; email: true; fullName: true; phone: true } };
         table: { select: { id: true; name: true; capacity: true } };
+        statusHistory: {
+          orderBy: { createdAt: 'asc' };
+          include: {
+            changedBy: { select: { id: true; fullName: true; email: true } };
+          };
+        };
       };
     }>[]
   > {
@@ -495,8 +563,39 @@ export class RestaurantsService {
           },
         },
         table: { select: { id: true, name: true, capacity: true } },
+        statusHistory: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            changedBy: { select: { id: true, fullName: true, email: true } },
+          },
+        },
       },
       orderBy: { startAt: 'desc' },
+    });
+  }
+
+  async getReservationStatusHistory(
+    restaurantId: string,
+    reservationId: string,
+    viewer: SafeUser,
+  ) {
+    await this.assertRestaurantExists(restaurantId);
+    await this.assertCanManageRestaurant(viewer, restaurantId);
+
+    const res = await this.prisma.reservation.findFirst({
+      where: { id: reservationId, restaurantId },
+      select: { id: true },
+    });
+    if (!res) {
+      throw new NotFoundException('Reservation not found');
+    }
+
+    return this.prisma.reservationStatusHistory.findMany({
+      where: { reservationId },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        changedBy: { select: { id: true, fullName: true, email: true } },
+      },
     });
   }
 
@@ -510,29 +609,69 @@ export class RestaurantsService {
       include: {
         customer: { select: { id: true; email: true; fullName: true; phone: true } };
         table: { select: { id: true; name: true; capacity: true } };
+        statusHistory: {
+          orderBy: { createdAt: 'asc' };
+          include: {
+            changedBy: { select: { id: true; fullName: true; email: true } };
+          };
+        };
       };
     }>
   > {
     await this.assertRestaurantExists(restaurantId);
     await this.assertCanManageRestaurant(actor, restaurantId);
 
-    const existing = await this.prisma.reservation.findFirst({
-      where: { id: reservationId, restaurantId },
-      select: { id: true },
-    });
-    if (!existing) {
-      throw new NotFoundException('Reservation not found');
-    }
+    return this.prisma.$transaction(async (tx) => {
+      const row = await tx.reservation.findFirst({
+        where: { id: reservationId, restaurantId },
+        select: { id: true, status: true },
+      });
+      if (!row) {
+        throw new NotFoundException('Reservation not found');
+      }
 
-    return this.prisma.reservation.update({
-      where: { id: reservationId },
-      data: { status: dto.status },
-      include: {
-        customer: {
-          select: { id: true, email: true, fullName: true, phone: true },
+      if (row.status === dto.status) {
+        throw new BadRequestException('Reservation is already in this status.');
+      }
+
+      if (RestaurantsService.TERMINAL.includes(row.status)) {
+        throw new BadRequestException(
+          `This reservation is final (${row.status}) and cannot be changed.`,
+        );
+      }
+
+      if (!this.isAllowedStatusTransition(row.status, dto.status)) {
+        throw new BadRequestException(
+          `Cannot change status from ${row.status} to ${dto.status} for this reservation.`,
+        );
+      }
+
+      await tx.reservationStatusHistory.create({
+        data: {
+          reservationId: row.id,
+          changedByUserId: actor.id,
+          fromStatus: row.status,
+          toStatus: dto.status,
+          note: dto.note?.trim() ? dto.note.trim() : null,
         },
-        table: { select: { id: true, name: true, capacity: true } },
-      },
+      });
+
+      return tx.reservation.update({
+        where: { id: reservationId },
+        data: { status: dto.status },
+        include: {
+          customer: {
+            select: { id: true, email: true, fullName: true, phone: true },
+          },
+          table: { select: { id: true, name: true, capacity: true } },
+          statusHistory: {
+            orderBy: { createdAt: 'asc' },
+            include: {
+              changedBy: { select: { id: true, fullName: true, email: true } },
+            },
+          },
+        },
+      });
     });
   }
 

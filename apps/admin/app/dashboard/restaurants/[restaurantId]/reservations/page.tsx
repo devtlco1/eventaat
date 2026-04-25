@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Badge } from '../../../../../components/Badge';
 import { Button } from '../../../../../components/Button';
 import {
@@ -217,6 +217,10 @@ export default function RestaurantReservationsPage() {
                     r.status === 'CANCELLED' ||
                     r.status === 'COMPLETED' ||
                     r.status === 'REJECTED';
+                  const canCancelThis =
+                    r.status === 'PENDING' ||
+                    r.status === 'HELD' ||
+                    r.status === 'CONFIRMED';
                   const disableActions = !canManage || busy || terminal;
                   const customerLabel =
                     r.customer?.email ?? r.customerId;
@@ -225,9 +229,11 @@ export default function RestaurantReservationsPage() {
                   const tableLabel = r.table
                     ? r.table.name
                     : 'Request only';
+                  const history = r.statusHistory ?? [];
 
                   return (
-                    <tr key={r.id} className="hover:bg-zinc-50/50">
+                    <Fragment key={r.id}>
+                    <tr className="hover:bg-zinc-50/50">
                       <td className="px-6 py-4">
                         <div className="font-medium text-zinc-900">
                           {customerLabel}
@@ -312,13 +318,40 @@ export default function RestaurantReservationsPage() {
                           <Button
                             variant="secondary"
                             onClick={() => setStatus(r.id, 'CANCELLED')}
-                            disabled={disableActions}
+                            disabled={disableActions || !canCancelThis}
                           >
                             Cancel
                           </Button>
                         </div>
                       </td>
                     </tr>
+                    {history.length > 0 ? (
+                      <tr className="bg-zinc-50/40">
+                        <td colSpan={9} className="px-6 py-2">
+                          <details>
+                            <summary className="cursor-pointer text-xs font-medium text-zinc-600">
+                              Status history ({history.length})
+                            </summary>
+                            <ul className="mt-2 list-none space-y-1 pl-0 text-xs text-zinc-600">
+                              {history.map((h) => (
+                                <li key={h.id}>
+                                  <span className="text-zinc-500">{fmt(h.createdAt)}</span>
+                                  {' — '}
+                                  {h.fromStatus ?? '—'} → {h.toStatus}
+                                  {h.note ? ` · ${h.note}` : ''}
+                                  {h.changedBy
+                                    ? ` (${
+                                        h.changedBy.fullName || h.changedBy.email
+                                      })`
+                                    : ''}
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        </td>
+                      </tr>
+                    ) : null}
+                    </Fragment>
                   );
                 })
               )}

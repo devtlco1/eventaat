@@ -100,6 +100,14 @@ export type ReservationRecord = {
   updatedAt: string;
 };
 
+/** Status audit entries for GET /me/reservations (no actor details). */
+export type ReservationStatusChangeSummary = {
+  fromStatus: ReservationStatus | null;
+  toStatus: ReservationStatus;
+  note: string | null;
+  createdAt: string;
+};
+
 /** Response from GET /me/reservations (includes restaurant + table when set). */
 export type MyReservation = ReservationRecord & {
   restaurant: {
@@ -109,4 +117,6 @@ export type MyReservation = ReservationRecord & {
     area: string | null;
   };
   table: { id: string; name: string; capacity: number } | null;
+  /** Omitted on older API versions. */
+  statusHistory?: ReservationStatusChangeSummary[];
 };

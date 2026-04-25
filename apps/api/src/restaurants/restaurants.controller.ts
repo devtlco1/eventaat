@@ -217,8 +217,26 @@ export class RestaurantsController {
   }
 
   /**
+   * GET /restaurants/:restaurantId/reservations/:reservationId/history
+   * Status audit trail. PLATFORM_ADMIN and assigned RESTAURANT_ADMIN only.
+   */
+  @Get(':restaurantId/reservations/:reservationId/history')
+  @Roles('PLATFORM_ADMIN', 'RESTAURANT_ADMIN')
+  getReservationStatusHistory(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @Param('reservationId', new ParseUUIDPipe()) reservationId: string,
+    @CurrentUser() user: SafeUser,
+  ) {
+    return this.restaurants.getReservationStatusHistory(
+      restaurantId,
+      reservationId,
+      user,
+    );
+  }
+
+  /**
    * PATCH /restaurants/:restaurantId/reservations/:reservationId/status
-   * Allowed statuses: HELD | CONFIRMED | REJECTED | CANCELLED | COMPLETED
+   * Optional body: { status, note? }. Validates lifecycle transitions.
    */
   @Patch(':restaurantId/reservations/:reservationId/status')
   @Roles('PLATFORM_ADMIN', 'RESTAURANT_ADMIN')

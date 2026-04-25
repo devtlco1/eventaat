@@ -52,6 +52,17 @@ const BOOK_LABEL: Record<BookingType, string> = {
   OTHER: 'Other',
 };
 
+function formatHistoryWhen(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString(undefined, {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    });
+  } catch {
+    return iso;
+  }
+}
+
 function formatWhereWhen(startIso: string, endIso: string): string {
   try {
     const s = new Date(startIso);
@@ -160,6 +171,21 @@ export function ReservationsScreen(_props: Props) {
           <View style={styles.noteBlock}>
             <Text style={styles.k}>Request</Text>
             <Text style={styles.note}>{r.specialRequest}</Text>
+          </View>
+        ) : null}
+        {r.statusHistory && r.statusHistory.length > 0 ? (
+          <View style={styles.historyBlock}>
+            <Text style={styles.historyLabel}>Status updates</Text>
+            {r.statusHistory.map((h, i) => {
+              const line = `${h.fromStatus ?? '—'} → ${h.toStatus}${
+                h.note ? ` · ${h.note}` : ''
+              }`;
+              return (
+                <Text key={`${h.createdAt}-${i}`} style={styles.historyLine}>
+                  {formatHistoryWhen(h.createdAt)} — {line}
+                </Text>
+              );
+            })}
           </View>
         ) : null}
       </View>
@@ -273,6 +299,21 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, gap: 12 },
   k: { fontSize: 13, color: '#64748b', fontWeight: '600' },
   v: { fontSize: 15, color: '#334155', textAlign: 'right', flex: 1, flexWrap: 'wrap' },
+  historyBlock: {
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+  },
+  historyLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#94a3b8',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 6,
+  },
+  historyLine: { fontSize: 13, color: '#64748b', lineHeight: 20, marginTop: 2 },
   noteBlock: { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
   note: { marginTop: 4, fontSize: 15, color: '#334155', lineHeight: 22 },
   badge: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, alignSelf: 'flex-start' },

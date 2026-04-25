@@ -59,7 +59,8 @@ model User {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   restaurantAssignments RestaurantAdmin[]
-  reservations          Reservation[]
+  reservations                 Reservation[]
+  reservationStatusAsActor     ReservationStatusHistory[] @relation("ReservationStatusChangeActor")
 
   @@map("users")
 }
@@ -120,12 +121,30 @@ model Reservation {
 
   customer   User            @relation(fields: [customerId], references: [id], onDelete: Cascade)
   restaurant Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  table      RestaurantTable? @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  table         RestaurantTable?            @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  statusHistory ReservationStatusHistory[]
 
   @@index([restaurantId])
   @@index([tableId, startAt, endAt])
   @@index([customerId])
   @@map("reservations")
+}
+
+model ReservationStatusHistory {
+  id              String   @id @default(uuid()) @db.Uuid
+  reservationId   String   @map("reservation_id") @db.Uuid
+  changedByUserId String?  @map("changed_by_user_id") @db.Uuid
+  fromStatus      ReservationStatus? @map("from_status")
+  toStatus        ReservationStatus  @map("to_status")
+  note            String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  changedBy   User?        @relation("ReservationStatusChangeActor", fields: [changedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([reservationId])
+  @@index([reservationId, createdAt])
+  @@map("reservation_status_history")
 }
 
 /// Join table that links a RESTAURANT_ADMIN user to one or more restaurants.
