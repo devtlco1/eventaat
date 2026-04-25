@@ -173,20 +173,38 @@ export function updateRestaurantTable(
 
 export type ReservationStatus =
   | 'PENDING'
+  | 'HELD'
   | 'CONFIRMED'
+  | 'REJECTED'
   | 'CANCELLED'
   | 'COMPLETED';
+
+export type GuestType = 'FAMILY' | 'YOUTH' | 'MIXED' | 'BUSINESS' | 'OTHER';
+export type SeatingPreference = 'INDOOR' | 'OUTDOOR' | 'NO_PREFERENCE';
+export type BookingType =
+  | 'STANDARD'
+  | 'EVENT_NIGHT'
+  | 'VIP'
+  | 'OCCASION'
+  | 'OTHER';
+
+export type AdminReservationStatus = Exclude<ReservationStatus, 'PENDING'>;
 
 export type RestaurantReservation = {
   id: string;
   customerId: string;
   restaurantId: string;
-  tableId: string;
+  tableId: string | null;
   partySize: number;
   startAt: string;
   endAt: string;
   status: ReservationStatus;
-  customerNote: string | null;
+  guestType: GuestType;
+  seatingPreference: SeatingPreference;
+  bookingType: BookingType;
+  occasionNote: string | null;
+  customerPhone: string | null;
+  specialRequest: string | null;
   createdAt: string;
   updatedAt: string;
   customer?: Pick<MeResponse, 'id' | 'email' | 'fullName'>;
@@ -207,7 +225,7 @@ export function updateReservationStatus(
   token: string,
   restaurantId: string,
   reservationId: string,
-  status: Exclude<ReservationStatus, 'PENDING'>,
+  status: AdminReservationStatus,
 ): Promise<RestaurantReservation> {
   return apiRequest<RestaurantReservation>(
     `/restaurants/${restaurantId}/reservations/${reservationId}/status`,

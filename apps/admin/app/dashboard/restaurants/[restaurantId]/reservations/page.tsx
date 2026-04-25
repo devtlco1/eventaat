@@ -10,6 +10,7 @@ import {
   listRestaurantReservations,
   listRestaurants,
   updateReservationStatus,
+  type AdminReservationStatus,
   type MeResponse,
   type ReservationStatus,
   type Restaurant,
@@ -21,8 +22,12 @@ function statusTone(status: ReservationStatus): Parameters<typeof Badge>[0]['ton
   switch (status) {
     case 'PENDING':
       return 'yellow';
+    case 'HELD':
+      return 'blue';
     case 'CONFIRMED':
       return 'blue';
+    case 'REJECTED':
+      return 'zinc';
     case 'CANCELLED':
       return 'zinc';
     case 'COMPLETED':
@@ -104,7 +109,7 @@ export default function RestaurantReservationsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restaurantId]);
 
-  async function setStatus(reservationId: string, status: 'CONFIRMED' | 'CANCELLED' | 'COMPLETED') {
+  async function setStatus(reservationId: string, status: AdminReservationStatus) {
     const token = getToken();
     if (!token) return;
     if (!canManage) return;
@@ -187,31 +192,40 @@ export default function RestaurantReservationsPage() {
                 <th className="px-6 py-3">Start</th>
                 <th className="px-6 py-3">End</th>
                 <th className="px-6 py-3">Status</th>
-                <th className="px-6 py-3">Note</th>
+                <th className="px-6 py-3">Guest / seat / type</th>
+                <th className="px-6 py-3">Contact & notes</th>
                 <th className="px-6 py-3">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200">
               {loading ? (
                 <tr>
-                  <td className="px-6 py-4 text-zinc-600" colSpan={8}>
+                  <td className="px-6 py-4 text-zinc-600" colSpan={9}>
                     Loading reservations…
                   </td>
                 </tr>
               ) : reservations.length === 0 ? (
                 <tr>
-                  <td className="px-6 py-4 text-zinc-600" colSpan={8}>
+                  <td className="px-6 py-4 text-zinc-600" colSpan={9}>
                     No reservations found.
                   </td>
                 </tr>
               ) : (
                 reservations.map((r) => {
                   const busy = !!updating[r.id];
-                  const disableActions = !canManage || busy || r.status === 'CANCELLED' || r.status === 'COMPLETED';
+                  const terminal =
+                    r.status === 'CANCELLED' ||
+                    r.status === 'COMPLETED' ||
+                    r.status === 'REJECTED';
+                  const disableActions = !canManage || busy || terminal;
                   const customerLabel =
                     r.customer?.email ?? r.customerId;
                   const customerName = r.customer?.fullName;
-                  const tableLabel = r.table?.name ?? r.tableId;
+                  const tableLabel = r.table
+                    ? r.table.name
+                    : r.tableId
+                      ? r.tableId
+                      : '—';
 
                   return (
                     <tr key={r.id} className="hover:bg-zinc-50/50">
@@ -230,29 +244,73 @@ export default function RestaurantReservationsPage() {
                       <td className="px-6 py-4">
                         <Badge tone={statusTone(r.status)}>{r.status}</Badge>
                       </td>
-                      <td className="px-6 py-4 text-zinc-700">
-                        {r.customerNote ?? '—'}
+                      <td className="max-w-[10rem] px-6 py-4 text-xs text-zinc-700">
+                        <div className="font-medium text-zinc-800">{r.guestType}</div>
+                        <div className="text-zinc-600">{r.seatingPreference}</div>
+                        <div className="text-zinc-500">{r.bookingType}</div>
+                      </td>
+                      <td className="max-w-[14rem] px-6 py-4 text-xs text-zinc-700">
+                        {r.customerPhone ? (
+                          <div>
+                            <span className="font-medium text-zinc-800">Phone: </span>
+                            {r.customerPhone}
+                          </div>
+                        ) : (
+                          <div className="text-zinc-400">Phone: —</div>
+                        )}
+                        {r.occasionNote ? (
+                          <div className="mt-1 line-clamp-2" title={r.occasionNote}>
+                            <span className="font-medium text-zinc-800">Occasion: </span>
+                            {r.occasionNote}
+                          </div>
+                        ) : null}
+                        {r.specialRequest ? (
+                          <div className="mt-1 line-clamp-2" title={r.specialRequest}>
+                            <span className="font-medium text-zinc-800">Request: </span>
+                            {r.specialRequest}
+                          </div>
+                        ) : null}
+                        {!r.occasionNote && !r.specialRequest ? (
+                          <div className="mt-1 text-zinc-400">—</div>
+                        ) : null}
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex max-w-md flex-wrap items-center gap-2">
+                          <Button
+                            variant="secondary"
+                            onClick={() => setStatus(r.id, 'HELD')}
+                            disabled={disableActions || r.status !== 'PENDING'}
+                          >
+                            Hold
+                          </Button>
                           <Button
                             variant="secondary"
                             onClick={() => setStatus(r.id, 'CONFIRMED')}
-                            disabled={disableActions || r.status !== 'PENDING'}
+                            disabled={
+                              disableActions ||
+                              (r.status !== 'PENDING' && r.status !== 'HELD')
+                            }
                           >
                             Confirm
                           </Button>
                           <Button
                             variant="secondary"
+                            onClick={() => setStatus(r.id, 'REJECTED')}
+                            disabled={disableActions || (r.status !== 'PENDING' && r.status !== 'HELD')}
+                          >
+                            Reject
+                          </Button>
+                          <Button
+                            variant="secondary"
                             onClick={() => setStatus(r.id, 'COMPLETED')}
-                            disabled={disableActions || (r.status !== 'CONFIRMED' && r.status !== 'PENDING')}
+                            disabled={disableActions || r.status !== 'CONFIRMED'}
                           >
                             Complete
                           </Button>
                           <Button
                             variant="secondary"
                             onClick={() => setStatus(r.id, 'CANCELLED')}
-                            disabled={disableActions || r.status === 'CANCELLED'}
+                            disabled={disableActions}
                           >
                             Cancel
                           </Button>

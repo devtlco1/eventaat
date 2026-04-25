@@ -50,3 +50,44 @@ export interface AvailabilityResponse {
   durationMinutes: number;
   slots: AvailabilitySlot[];
 }
+
+export type GuestType = 'FAMILY' | 'YOUTH' | 'MIXED' | 'BUSINESS' | 'OTHER';
+export type SeatingPreference = 'INDOOR' | 'OUTDOOR' | 'NO_PREFERENCE';
+export type BookingType =
+  | 'STANDARD'
+  | 'EVENT_NIGHT'
+  | 'VIP'
+  | 'OCCASION'
+  | 'OTHER';
+
+export type CreateReservationRequestBody = {
+  partySize: number;
+  startAt: string;
+  endAt: string;
+  guestType: GuestType;
+  seatingPreference: SeatingPreference;
+  bookingType: BookingType;
+  customerPhone?: string;
+  occasionNote?: string;
+  specialRequest?: string;
+  tableId?: string;
+};
+
+export type ReservationRecord = {
+  id: string;
+  customerId: string;
+  restaurantId: string;
+  tableId: string | null;
+  partySize: number;
+  startAt: string;
+  endAt: string;
+  status: string;
+  guestType: GuestType;
+  seatingPreference: SeatingPreference;
+  bookingType: BookingType;
+  occasionNote: string | null;
+  customerPhone: string | null;
+  specialRequest: string | null;
+  createdAt: string;
+  updatedAt: string;
+};

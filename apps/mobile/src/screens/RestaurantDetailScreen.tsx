@@ -2,6 +2,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,14 +12,35 @@ import {
 } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
-import { fetchAvailability, fetchRestaurantById } from '../lib/api';
-import type { AvailabilityResponse, RestaurantDetail } from '../lib/types';
+import {
+  createReservationRequest,
+  fetchAvailability,
+  fetchRestaurantById,
+} from '../lib/api';
+import type {
+  AvailabilityResponse,
+  BookingType,
+  GuestType,
+  RestaurantDetail,
+  SeatingPreference,
+} from '../lib/types';
 import { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RestaurantDetail'>;
 
 const DEFAULT_DURATION = '90';
 const DEFAULT_PARTY = '2';
+const DEFAULT_TIME = '19:00';
+
+const GUEST_TYPES: GuestType[] = ['FAMILY', 'YOUTH', 'MIXED', 'BUSINESS', 'OTHER'];
+const SEATING: SeatingPreference[] = ['INDOOR', 'OUTDOOR', 'NO_PREFERENCE'];
+const BOOKING_TYPES: BookingType[] = [
+  'STANDARD',
+  'EVENT_NIGHT',
+  'VIP',
+  'OCCASION',
+  'OTHER',
+];
 
 function isValidYyyyMmDd(s: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s.trim())) return false;
@@ -32,6 +54,10 @@ function isValidYyyyMmDd(s: string): boolean {
   return (
     !isNaN(dt.getTime()) && dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d
   );
+}
+
+function isValidHhMm(s: string): boolean {
+  return /^([01]?\d|2[0-3]):[0-5]\d$/.test(s.trim());
 }
 
 function todayYyyyMmDd(): string {
@@ -54,6 +80,27 @@ function formatTimeRange(isoStart: string, isoEnd: string): { start: string; end
   }
 }
 
+type ParsedAvailabilityForm = { date: string; partySize: number; durationMinutes: number };
+
+function buildReservationWindow(
+  dateYmd: string,
+  timeHm: string,
+  durationMinutes: number,
+): { startAt: string; endAt: string } | { error: string } {
+  const t = timeHm.trim();
+  if (!isValidHhMm(t)) {
+    return { error: 'Time must be HH:MM in 24-hour form (e.g. 19:00).' };
+  }
+  const [hh, mm] = t.split(':').map((x) => parseInt(x, 10));
+  const [y, m, d] = dateYmd.split('-').map((x) => parseInt(x, 10));
+  const start = new Date(y, m - 1, d, hh, mm, 0, 0);
+  if (isNaN(start.getTime())) {
+    return { error: 'Invalid date or time.' };
+  }
+  const end = new Date(start.getTime() + durationMinutes * 60 * 1000);
+  return { startAt: start.toISOString(), endAt: end.toISOString() };
+}
+
 export function RestaurantDetailScreen({ route, navigation }: Props) {
   const { restaurantId } = route.params;
   const { token, signOut } = useAuth();
@@ -65,7 +112,16 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
   const [dateStr, setDateStr] = useState(todayYyyyMmDd());
   const [partyStr, setPartyStr] = useState(DEFAULT_PARTY);
   const [durationStr, setDurationStr] = useState(DEFAULT_DURATION);
+  const [timeStr, setTimeStr] = useState(DEFAULT_TIME);
+  const [guestType, setGuestType] = useState<GuestType>('MIXED');
+  const [seatingPreference, setSeatingPreference] = useState<SeatingPreference>('NO_PREFERENCE');
+  const [bookingType, setBookingType] = useState<BookingType>('STANDARD');
+  const [phoneStr, setPhoneStr] = useState('');
+  const [noteStr, setNoteStr] = useState('');
+
   const [formError, setFormError] = useState<string | null>(null);
+  const [requestSubmitting, setRequestSubmitting] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
 
   const [availability, setAvailability] = useState<AvailabilityResponse | null>(null);
   const [availError, setAvailError] = useState<string | null>(null);
@@ -96,7 +152,7 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
     void loadRestaurant();
   }, [loadRestaurant]);
 
-  const parseAndValidateForm = useCallback((): { date: string; partySize: number; durationMinutes: number } | null => {
+  const parseAndValidateForm = useCallback((): ParsedAvailabilityForm | null => {
     setFormError(null);
     const date = dateStr.trim();
     if (!isValidYyyyMmDd(date)) {
@@ -139,6 +195,53 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
     }
   };
 
+  const onSubmitReservation = async () => {
+    if (!token) return;
+    setRequestError(null);
+    const parsed = parseAndValidateForm();
+    if (!parsed) {
+      setRequestError('Please correct date, party size, and duration (30–240 minutes).');
+      return;
+    }
+    const window = buildReservationWindow(parsed.date, timeStr, parsed.durationMinutes);
+    if ('error' in window) {
+      setRequestError(window.error);
+      return;
+    }
+    const startAtMs = new Date(window.startAt).getTime();
+    if (startAtMs <= Date.now()) {
+      setRequestError('Start time must be in the future.');
+      return;
+    }
+
+    setRequestSubmitting(true);
+    try {
+      await createReservationRequest(token, restaurantId, {
+        partySize: parsed.partySize,
+        startAt: window.startAt,
+        endAt: window.endAt,
+        guestType,
+        seatingPreference,
+        bookingType,
+        customerPhone: phoneStr.trim() || undefined,
+        specialRequest: noteStr.trim() || undefined,
+      });
+      Alert.alert(
+        'Request sent',
+        'Your reservation request was submitted. The restaurant will confirm or respond based on availability.',
+        [{ text: 'OK' }],
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Request failed';
+      setRequestError(msg);
+      if (msg.includes('401')) {
+        await signOut();
+      }
+    } finally {
+      setRequestSubmitting(false);
+    }
+  };
+
   if (loadPending) {
     return (
       <View style={styles.centered}>
@@ -178,7 +281,7 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
         ) : null}
       </View>
 
-      <Text style={styles.sectionTitle}>Check availability</Text>
+      <Text style={styles.sectionTitle}>Request a reservation</Text>
       <View style={styles.card}>
         <Text style={styles.label}>Date (YYYY-MM-DD)</Text>
         <TextInput
@@ -188,6 +291,16 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
           autoCapitalize="none"
           autoCorrect={false}
           placeholder="2026-04-30"
+          placeholderTextColor="#94a3b8"
+        />
+        <Text style={styles.label}>Time (24h, HH:MM)</Text>
+        <TextInput
+          style={styles.input}
+          value={timeStr}
+          onChangeText={setTimeStr}
+          autoCapitalize="none"
+          autoCorrect={false}
+          placeholder="19:00"
           placeholderTextColor="#94a3b8"
         />
         <Text style={styles.label}>Party size</Text>
@@ -204,6 +317,89 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
           onChangeText={setDurationStr}
           keyboardType="number-pad"
         />
+        <Text style={styles.label}>Guest type</Text>
+        <View style={styles.chipRow}>
+          {GUEST_TYPES.map((g) => (
+            <Pressable
+              key={g}
+              onPress={() => setGuestType(g)}
+              style={[styles.chip, guestType === g && styles.chipSelected]}
+            >
+              <Text style={[styles.chipText, guestType === g && styles.chipTextSelected]}>{g}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={styles.label}>Seating</Text>
+        <View style={styles.chipRow}>
+          {SEATING.map((s) => (
+            <Pressable
+              key={s}
+              onPress={() => setSeatingPreference(s)}
+              style={[styles.chip, seatingPreference === s && styles.chipSelected]}
+            >
+              <Text
+                style={[styles.chipText, seatingPreference === s && styles.chipTextSelected]}
+              >
+                {s.replace(/_/g, ' ')}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={styles.label}>Booking type</Text>
+        <View style={styles.chipRow}>
+          {BOOKING_TYPES.map((b) => (
+            <Pressable
+              key={b}
+              onPress={() => setBookingType(b)}
+              style={[styles.chip, bookingType === b && styles.chipSelected]}
+            >
+              <Text
+                style={[styles.chipText, bookingType === b && styles.chipTextSelected]}
+              >
+                {b.replace(/_/g, ' ')}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={styles.label}>Phone (optional)</Text>
+        <TextInput
+          style={styles.input}
+          value={phoneStr}
+          onChangeText={setPhoneStr}
+          keyboardType="phone-pad"
+          placeholder="For the restaurant to reach you"
+          placeholderTextColor="#94a3b8"
+        />
+        <Text style={styles.label}>Note (optional)</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          value={noteStr}
+          onChangeText={setNoteStr}
+          placeholder="Diet, occasion, or other details"
+          placeholderTextColor="#94a3b8"
+          multiline
+        />
+        {formError ? <Text style={styles.formErrorText}>{formError}</Text> : null}
+        {requestError ? <Text style={styles.formErrorText}>{requestError}</Text> : null}
+        <Pressable
+          style={[styles.primaryBtn, requestSubmitting && styles.btnDisabled]}
+          onPress={() => void onSubmitReservation()}
+          disabled={requestSubmitting}
+        >
+          {requestSubmitting ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.primaryBtnText}>Send reservation request</Text>
+          )}
+        </Pressable>
+      </View>
+
+      <Text style={styles.sectionTitle}>Check availability (optional)</Text>
+      <View style={styles.card}>
+        <Text style={styles.hintP}>
+          Uses table capacity for reference only. You can send a request above without matching a
+          specific table.
+        </Text>
         {formError ? <Text style={styles.formErrorText}>{formError}</Text> : null}
         <Pressable
           style={[styles.primaryBtn, availLoading && styles.btnDisabled]}
@@ -230,8 +426,9 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
             <View style={styles.emptyState}>
               <Text style={styles.emptyTitle}>No open slots</Text>
               <Text style={styles.emptySub}>
-                No tables with enough capacity for {availability.partySize} guests on {availability.date}, or all
-                possible times are booked. Try another date, party size, or duration.
+                No tables with enough capacity for {availability.partySize} guests on {availability.date}, or
+                all possible times are booked. You can still submit a request if the restaurant can
+                accommodate you another way.
               </Text>
             </View>
           ) : (
@@ -242,16 +439,12 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
                   <Text style={styles.slotTime}>
                     {start} – {end}
                   </Text>
-                  <Text style={styles.tableLabel}>Available tables</Text>
+                  <Text style={styles.tableLabel}>Sample tables (capacity reference)</Text>
                   {slot.tables.map((t) => (
                     <Text key={t.id} style={styles.tableRow}>
                       {t.name} — seats {t.capacity}
                     </Text>
                   ))}
-                  <Pressable style={styles.reserveDisabled} disabled accessibilityState={{ disabled: true }}>
-                    <Text style={styles.reserveDisabledText}>Reserve</Text>
-                    <Text style={styles.reserveHint}>Coming in a later step</Text>
-                  </Pressable>
                 </View>
               );
             })
@@ -303,6 +496,20 @@ const styles = StyleSheet.create({
     color: '#0f172a',
     backgroundColor: '#fafafa',
   },
+  textArea: { minHeight: 80, textAlignVertical: 'top' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  chip: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+  },
+  chipSelected: { borderColor: '#2563eb', backgroundColor: '#eff6ff' },
+  chipText: { fontSize: 12, fontWeight: '600', color: '#475569' },
+  chipTextSelected: { color: '#1d4ed8' },
+  hintP: { fontSize: 14, color: '#64748b', lineHeight: 20, marginBottom: 12 },
   formErrorText: { color: '#b91c1c', marginTop: 8, fontSize: 14 },
   primaryBtn: {
     backgroundColor: '#2563eb',
@@ -337,14 +544,5 @@ const styles = StyleSheet.create({
   slotTime: { fontSize: 17, fontWeight: '600', color: '#0f172a' },
   tableLabel: { marginTop: 10, fontSize: 13, fontWeight: '600', color: '#64748b', textTransform: 'uppercase' },
   tableRow: { fontSize: 15, color: '#334155', marginTop: 4 },
-  reserveDisabled: {
-    marginTop: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#f1f5f9',
-    alignItems: 'center',
-  },
-  reserveDisabledText: { fontSize: 15, fontWeight: '600', color: '#94a3b8' },
-  reserveHint: { fontSize: 12, color: '#cbd5e1', marginTop: 2 },
   spacer: { height: 8 },
 });

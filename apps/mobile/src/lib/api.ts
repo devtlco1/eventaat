@@ -1,6 +1,8 @@
 import type {
   AuthLoginResponse,
   AvailabilityResponse,
+  CreateReservationRequestBody,
+  ReservationRecord,
   Restaurant,
   RestaurantDetail,
 } from './types';
@@ -110,4 +112,27 @@ export async function fetchAvailability(
     throw new Error(message);
   }
   return res.json() as Promise<AvailabilityResponse>;
+}
+
+export async function createReservationRequest(
+  accessToken: string,
+  restaurantId: string,
+  body: CreateReservationRequestBody,
+): Promise<ReservationRecord> {
+  const res = await fetch(`${baseUrl()}/restaurants/${restaurantId}/reservations`, {
+    method: 'POST',
+    headers: { ...authHeaders(accessToken), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 401) {
+    throw new Error('Unauthorized (401) — sign in again.');
+  }
+  if (!res.ok) {
+    const message = await readErrorMessage(
+      res,
+      `Could not send reservation request (${res.status})`,
+    );
+    throw new Error(message);
+  }
+  return res.json() as Promise<ReservationRecord>;
 }

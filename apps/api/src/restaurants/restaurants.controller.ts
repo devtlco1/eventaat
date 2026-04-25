@@ -218,7 +218,7 @@ export class RestaurantsController {
 
   /**
    * PATCH /restaurants/:restaurantId/reservations/:reservationId/status
-   * Allowed statuses: CONFIRMED | CANCELLED | COMPLETED
+   * Allowed statuses: HELD | CONFIRMED | REJECTED | CANCELLED | COMPLETED
    */
   @Patch(':restaurantId/reservations/:reservationId/status')
   @Roles('PLATFORM_ADMIN', 'RESTAURANT_ADMIN')

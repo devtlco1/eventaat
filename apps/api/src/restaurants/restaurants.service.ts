@@ -169,6 +169,13 @@ export class RestaurantsService {
     return rows as Array<RestaurantAdmin & { user: SafeUser }>;
   }
 
+  /** Reservations that still occupy a table for overlap checks. */
+  private static readonly TABLE_BLOCKING_STATUSES: ReservationStatus[] = [
+    ReservationStatus.PENDING,
+    ReservationStatus.HELD,
+    ReservationStatus.CONFIRMED,
+  ];
+
   /**
    * Removes an admin assignment.
    * Returns 404 if restaurant or the specific assignment doesn't exist.
@@ -381,49 +388,59 @@ export class RestaurantsService {
       throw new UnprocessableEntityException('endAt must be after startAt');
     }
 
-    const table = await this.prisma.restaurantTable.findFirst({
-      where: {
-        id: dto.tableId,
-        restaurantId,
-        isActive: true,
-      },
-      select: { id: true, capacity: true },
-    });
-    if (!table) {
-      throw new NotFoundException('Table not found');
-    }
+    let tableId: string | null = null;
+    if (dto.tableId) {
+      const table = await this.prisma.restaurantTable.findFirst({
+        where: {
+          id: dto.tableId,
+          restaurantId,
+          isActive: true,
+        },
+        select: { id: true, capacity: true },
+      });
+      if (!table) {
+        throw new NotFoundException('Table not found');
+      }
 
-    if (dto.partySize > table.capacity) {
-      throw new UnprocessableEntityException(
-        'partySize must not exceed table capacity',
-      );
-    }
+      if (dto.partySize > table.capacity) {
+        throw new UnprocessableEntityException(
+          'partySize must not exceed table capacity',
+        );
+      }
 
-    const overlapping = await this.prisma.reservation.findFirst({
-      where: {
-        tableId: table.id,
-        status: { in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED] },
-        startAt: { lt: endAt },
-        endAt: { gt: startAt },
-      },
-      select: { id: true },
-    });
-    if (overlapping) {
-      throw new ConflictException(
-        'Overlapping reservation exists for this table',
-      );
+      const overlapping = await this.prisma.reservation.findFirst({
+        where: {
+          tableId: table.id,
+          status: { in: RestaurantsService.TABLE_BLOCKING_STATUSES },
+          startAt: { lt: endAt },
+          endAt: { gt: startAt },
+        },
+        select: { id: true },
+      });
+      if (overlapping) {
+        throw new ConflictException(
+          'Overlapping reservation exists for this table',
+        );
+      }
+
+      tableId = table.id;
     }
 
     return this.prisma.reservation.create({
       data: {
         customerId: customer.id,
         restaurantId,
-        tableId: table.id,
+        tableId,
         partySize: dto.partySize,
         startAt,
         endAt,
         status: ReservationStatus.PENDING,
-        customerNote: dto.customerNote,
+        guestType: dto.guestType,
+        seatingPreference: dto.seatingPreference,
+        bookingType: dto.bookingType,
+        occasionNote: dto.occasionNote,
+        customerPhone: dto.customerPhone,
+        specialRequest: dto.specialRequest,
       },
     });
   }
@@ -446,7 +463,7 @@ export class RestaurantsService {
     Array<
       Reservation & {
         customer: SafeUser;
-        table: RestaurantTable;
+        table: RestaurantTable | null;
       }
     >
   > {
@@ -476,7 +493,7 @@ export class RestaurantsService {
     return rows as Array<
       Reservation & {
         customer: SafeUser;
-        table: RestaurantTable;
+        table: RestaurantTable | null;
       }
     >;
   }
@@ -567,7 +584,7 @@ export class RestaurantsService {
       where: {
         restaurantId,
         tableId: { in: tables.map((t) => t.id) },
-        status: { in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED] },
+        status: { in: RestaurantsService.TABLE_BLOCKING_STATUSES },
         startAt: { lt: closeAt },
         endAt: { gt: openAt },
       },
@@ -579,6 +596,7 @@ export class RestaurantsService {
       Array<{ startAt: Date; endAt: Date }>
     >();
     for (const r of relevantReservations) {
+      if (!r.tableId) continue;
       const arr = reservationsByTable.get(r.tableId) ?? [];
       arr.push({ startAt: r.startAt, endAt: r.endAt });
       reservationsByTable.set(r.tableId, arr);
