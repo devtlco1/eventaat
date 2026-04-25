@@ -5,19 +5,16 @@
   "description": "eventaat backend API (NestJS + Prisma + PostgreSQL)",
   "main": "dist/main.js",
   "scripts": {
-    "predev": "npm run build -w @eventaat/shared",
-    "dev": "nest start --watch",
-    "prebuild": "npm run build -w @eventaat/shared",
-    "build": "nest build",
+    "dev": "node --max-old-space-size=8192 ../../node_modules/@nestjs/cli/bin/nest.js start --watch",
+    "build": "node --max-old-space-size=8192 ../../node_modules/@nestjs/cli/bin/nest.js build",
     "start": "node dist/main.js",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "node --max-old-space-size=8192 ../../node_modules/typescript/lib/tsc.js -p tsconfig.json --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "test": "echo \"no tests yet\""
   },
   "dependencies": {
-    "@eventaat/shared": "*",
     "@nestjs/common": "^10.4.4",
     "@nestjs/config": "^3.2.3",
     "@nestjs/core": "^10.4.4",
@@ -44,6 +41,6 @@
     "ts-loader": "^9.5.1",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.5.4"
+    "typescript": "5.5.4"
   }
 }

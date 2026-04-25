@@ -21,6 +21,9 @@ export class PrismaService
   private readonly logger = new Logger(PrismaService.name);
 
   async onModuleInit(): Promise<void> {
+    if (process.env.EVENTAAT_DEBUG_BOOT === '1') {
+      this.logger.log('onModuleInit: $connect() starting');
+    }
     try {
       await this.$connect();
       this.logger.log('Prisma connected to database');

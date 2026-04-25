@@ -24,6 +24,11 @@ import { CreateRestaurantTableDto } from './dto/create-restaurant-table.dto';
 import { UpdateRestaurantDto } from './dto/update-restaurant.dto';
 import { UpdateReservationStatusDto } from './dto/update-reservation-status.dto';
 import { UpdateRestaurantTableDto } from './dto/update-restaurant-table.dto';
+import type {
+  AdminReservationView,
+  AdminStatusHistoryEntry,
+  CustomerReservationListItem,
+} from './reservation-views';
 
 @Injectable()
 export class RestaurantsService {
@@ -76,13 +81,12 @@ export class RestaurantsService {
    * Everyone else sees only active ones.
    */
   list(viewer: SafeUser): Promise<Restaurant[]> {
-    const where: Prisma.RestaurantWhereInput =
-      viewer.role === Role.PLATFORM_ADMIN ? {} : { isActive: true };
-
+    // Avoid Prisma.*WhereInput annotations — they can explode TS work with strict mode.
     return this.prisma.restaurant.findMany({
-      where,
+      where:
+        viewer.role === Role.PLATFORM_ADMIN ? {} : { isActive: true },
       orderBy: { createdAt: 'desc' },
-    });
+    } as any) as Promise<Restaurant[]>;
   }
 
   async findOne(id: string, viewer: SafeUser): Promise<Restaurant> {
@@ -334,15 +338,13 @@ export class RestaurantsService {
   ): Promise<RestaurantTable[]> {
     await this.assertRestaurantVisible(restaurantId, viewer);
 
-    const where: Prisma.RestaurantTableWhereInput =
-      viewer.role === Role.CUSTOMER
-        ? { restaurantId, isActive: true }
-        : { restaurantId };
-
     return this.prisma.restaurantTable.findMany({
-      where,
+      where:
+        viewer.role === Role.CUSTOMER
+          ? { restaurantId, isActive: true }
+          : { restaurantId },
       orderBy: [{ isActive: 'desc' }, { createdAt: 'asc' }],
-    });
+    } as any) as Promise<RestaurantTable[]>;
   }
 
   async findTable(
@@ -352,12 +354,14 @@ export class RestaurantsService {
   ): Promise<RestaurantTable> {
     await this.assertRestaurantVisible(restaurantId, viewer);
 
-    const where: Prisma.RestaurantTableWhereInput =
+    const where =
       viewer.role === Role.CUSTOMER
         ? { id: tableId, restaurantId, isActive: true }
         : { id: tableId, restaurantId };
 
-    const table = await this.prisma.restaurantTable.findFirst({ where });
+    const table = (await this.prisma.restaurantTable.findFirst({
+      where,
+    } as any)) as RestaurantTable | null;
     if (!table) {
       throw new NotFoundException('Table not found');
     }
@@ -494,25 +498,16 @@ export class RestaurantsService {
     });
   }
 
-  listMyReservations(
+  async listMyReservations(
     customer: SafeUser,
-  ): Promise<
-    Prisma.ReservationGetPayload<{
-      include: {
-        restaurant: { select: { id: true; name: true; city: true; area: true } };
-        table: { select: { id: true; name: true; capacity: true } };
-        statusHistory: {
-          orderBy: { createdAt: 'asc' };
-          select: { fromStatus: true; toStatus: true; note: true; createdAt: true };
-        };
-      };
-    }>[]
-  > {
+  ): Promise<CustomerReservationListItem[]> {
     if (customer.role !== Role.CUSTOMER) {
       throw new ForbiddenException('Only customers can view this endpoint');
     }
 
-    return this.prisma.reservation.findMany({
+    // `as any` avoids Prisma+TS pathological type inference on nested includes
+    // (tsc can hang for minutes). Shape is covered by `CustomerReservationListItem`.
+    return (await this.prisma.reservation.findMany({
       where: { customerId: customer.id },
       orderBy: { startAt: 'desc' },
       include: {
@@ -528,30 +523,17 @@ export class RestaurantsService {
           },
         },
       },
-    });
+    } as any)) as CustomerReservationListItem[];
   }
 
   async listRestaurantReservations(
     restaurantId: string,
     viewer: SafeUser,
-  ): Promise<
-    Prisma.ReservationGetPayload<{
-      include: {
-        customer: { select: { id: true; email: true; fullName: true; phone: true } };
-        table: { select: { id: true; name: true; capacity: true } };
-        statusHistory: {
-          orderBy: { createdAt: 'asc' };
-          include: {
-            changedBy: { select: { id: true; fullName: true; email: true } };
-          };
-        };
-      };
-    }>[]
-  > {
+  ): Promise<AdminReservationView[]> {
     await this.assertRestaurantExists(restaurantId);
     await this.assertCanManageRestaurant(viewer, restaurantId);
 
-    return this.prisma.reservation.findMany({
+    return (await this.prisma.reservation.findMany({
       where: { restaurantId },
       include: {
         customer: {
@@ -571,7 +553,7 @@ export class RestaurantsService {
         },
       },
       orderBy: { startAt: 'desc' },
-    });
+    } as any)) as AdminReservationView[];
   }
 
   async getReservationStatusHistory(
@@ -590,13 +572,13 @@ export class RestaurantsService {
       throw new NotFoundException('Reservation not found');
     }
 
-    return this.prisma.reservationStatusHistory.findMany({
+    return (await this.prisma.reservationStatusHistory.findMany({
       where: { reservationId },
       orderBy: { createdAt: 'asc' },
       include: {
         changedBy: { select: { id: true, fullName: true, email: true } },
       },
-    });
+    } as any)) as AdminStatusHistoryEntry[];
   }
 
   async updateReservationStatus(
@@ -604,20 +586,7 @@ export class RestaurantsService {
     reservationId: string,
     dto: UpdateReservationStatusDto,
     actor: SafeUser,
-  ): Promise<
-    Prisma.ReservationGetPayload<{
-      include: {
-        customer: { select: { id: true; email: true; fullName: true; phone: true } };
-        table: { select: { id: true; name: true; capacity: true } };
-        statusHistory: {
-          orderBy: { createdAt: 'asc' };
-          include: {
-            changedBy: { select: { id: true; fullName: true; email: true } };
-          };
-        };
-      };
-    }>
-  > {
+  ): Promise<AdminReservationView> {
     await this.assertRestaurantExists(restaurantId);
     await this.assertCanManageRestaurant(actor, restaurantId);
 
@@ -656,7 +625,7 @@ export class RestaurantsService {
         },
       });
 
-      return tx.reservation.update({
+      return (await tx.reservation.update({
         where: { id: reservationId },
         data: { status: dto.status },
         include: {
@@ -671,7 +640,7 @@ export class RestaurantsService {
             },
           },
         },
-      });
+      } as any)) as AdminReservationView;
     });
   }
 

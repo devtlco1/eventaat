@@ -4,8 +4,20 @@ import { ConfigService } from '@nestjs/config';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 
+const bootLog = (msg: string): void => {
+  if (process.env.EVENTAAT_DEBUG_BOOT === '1') {
+    // Timestamps help local debugging when the process “hangs” before listen.
+    console.log(`[${new Date().toISOString()}] ${msg}`);
+  }
+};
+
 async function bootstrap(): Promise<void> {
+  const logger = new Logger('Bootstrap');
+  bootLog('before NestFactory.create(AppModule)');
+
   const app = await NestFactory.create(AppModule);
+
+  bootLog('after NestFactory.create; configuring HTTP');
 
   app.enableCors({
     origin: ['http://localhost:3000'],
@@ -26,9 +38,10 @@ async function bootstrap(): Promise<void> {
   const config = app.get(ConfigService);
   const port = Number(config.get<string>('PORT') ?? 4000);
 
+  bootLog(`before app.listen(${port})`);
   await app.listen(port);
+  bootLog('after app.listen');
 
-  const logger = new Logger('Bootstrap');
   logger.log(`eventaat API listening on http://localhost:${port}`);
   logger.log(`Health check: http://localhost:${port}/health`);
 }

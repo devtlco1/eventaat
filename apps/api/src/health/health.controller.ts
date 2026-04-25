@@ -1,5 +1,4 @@
 import { Controller, Get } from '@nestjs/common';
-import { APP_NAME } from '@eventaat/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
 type DatabaseStatus = 'ok' | 'unavailable';
@@ -24,7 +23,7 @@ export class HealthController {
 
     return {
       status: dbHealthy ? 'ok' : 'degraded',
-      service: `${APP_NAME}-api`,
+      service: 'eventaat-api',
       version: '0.0.1',
       database: dbHealthy ? 'ok' : 'unavailable',
       timestamp: new Date().toISOString(),
