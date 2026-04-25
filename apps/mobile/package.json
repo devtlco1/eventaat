@@ -1,0 +1,14 @@
+{
+  "name": "@eventaat/mobile",
+  "version": "0.0.1",
+  "private": true,
+  "description": "eventaat customer mobile app (React Native + Expo)",
+  "scripts": {
+    "dev": "echo \"Mobile not scaffolded yet (later step)\"",
+    "build": "echo \"Mobile not scaffolded yet (later step)\"",
+    "typecheck": "echo \"Mobile not scaffolded yet (later step)\""
+  },
+  "dependencies": {
+    "@eventaat/shared": "*"
+  }
+}

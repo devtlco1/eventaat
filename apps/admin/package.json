@@ -1,0 +1,14 @@
+{
+  "name": "@eventaat/admin",
+  "version": "0.0.1",
+  "private": true,
+  "description": "eventaat admin dashboard (Next.js)",
+  "scripts": {
+    "dev": "echo \"Admin not scaffolded yet (later step)\"",
+    "build": "echo \"Admin not scaffolded yet (later step)\"",
+    "typecheck": "echo \"Admin not scaffolded yet (later step)\""
+  },
+  "dependencies": {
+    "@eventaat/shared": "*"
+  }
+}
