@@ -13,21 +13,43 @@ import {
 
 import { useAuth } from '../context/AuthContext';
 import { fetchMyReservations } from '../lib/api';
-import type { MyReservation, ReservationStatus } from '../lib/types';
+import type { BookingType, GuestType, MyReservation, ReservationStatus, SeatingPreference } from '../lib/types';
 import { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Reservations'>;
 
 const STATUS_BADGE: Record<
   ReservationStatus,
-  { bg: string; text: string; label: string }
+  { bg: string; text: string; display: string }
 > = {
-  PENDING: { bg: '#fef3c7', text: '#92400e', label: 'PENDING' },
-  HELD: { bg: '#dbeafe', text: '#1e40af', label: 'HELD' },
-  CONFIRMED: { bg: '#d1fae5', text: '#065f46', label: 'CONFIRMED' },
-  REJECTED: { bg: '#fee2e2', text: '#991b1b', label: 'REJECTED' },
-  CANCELLED: { bg: '#f4f4f5', text: '#52525b', label: 'CANCELLED' },
-  COMPLETED: { bg: '#ecfdf5', text: '#047857', label: 'COMPLETED' },
+  PENDING: { bg: '#fef3c7', text: '#92400e', display: 'Pending' },
+  HELD: { bg: '#dbeafe', text: '#1e40af', display: 'Held' },
+  CONFIRMED: { bg: '#d1fae5', text: '#065f46', display: 'Confirmed' },
+  REJECTED: { bg: '#fee2e2', text: '#991b1b', display: 'Rejected' },
+  CANCELLED: { bg: '#f1f5f9', text: '#475569', display: 'Cancelled' },
+  COMPLETED: { bg: '#d1fae5', text: '#047857', display: 'Completed' },
+};
+
+const GUEST_LABEL: Record<GuestType, string> = {
+  FAMILY: 'Families',
+  YOUTH: 'Youth',
+  MIXED: 'Mixed',
+  BUSINESS: 'Business',
+  OTHER: 'Other',
+};
+
+const SEAT_LABEL: Record<SeatingPreference, string> = {
+  INDOOR: 'Indoor',
+  OUTDOOR: 'Outdoor',
+  NO_PREFERENCE: 'No preference',
+};
+
+const BOOK_LABEL: Record<BookingType, string> = {
+  STANDARD: 'Standard',
+  EVENT_NIGHT: 'Event night',
+  VIP: 'VIP',
+  OCCASION: 'Occasion',
+  OTHER: 'Other',
 };
 
 function formatWhereWhen(startIso: string, endIso: string): string {
@@ -44,14 +66,6 @@ function formatWhereWhen(startIso: string, endIso: string): string {
   } catch {
     return `${startIso} – ${endIso}`;
   }
-}
-
-function displaySeating(s: string): string {
-  return s.replace(/_/g, ' ');
-}
-
-function displayBooking(s: string): string {
-  return s.replace(/_/g, ' ');
 }
 
 function placeSubtitle(r: MyReservation): string {
@@ -113,33 +127,34 @@ export function ReservationsScreen(_props: Props) {
     const badge = STATUS_BADGE[st] ?? {
       bg: '#f4f4f5',
       text: '#3f3f46',
-      label: r.status,
+      display: r.status,
     };
     const name = r.restaurant.name;
     const loc = placeSubtitle(r);
     return (
-      <View style={styles.card} accessibilityLabel={`Reservation ${r.status}`}>
+      <View style={styles.card} accessibilityLabel={`Reservation ${badge.display}`}>
         <View style={styles.cardHeader}>
           <View style={styles.titleBlock}>
             <Text style={styles.placeName}>{name}</Text>
             {loc ? <Text style={styles.placeLoc}>{loc}</Text> : null}
           </View>
           <View style={[styles.badge, { backgroundColor: badge.bg }]}>
-            <Text style={[styles.badgeText, { color: badge.text }]}>{badge.label}</Text>
+            <Text style={[styles.badgeText, { color: badge.text }]}>{badge.display}</Text>
           </View>
         </View>
+        <Text style={styles.whenLabel}>Date & time</Text>
         <Text style={styles.whenText}>{formatWhereWhen(r.startAt, r.endAt)}</Text>
         <View style={styles.row}>
           <Text style={styles.k}>Guest type</Text>
-          <Text style={styles.v}>{r.guestType}</Text>
+          <Text style={styles.v}>{GUEST_LABEL[r.guestType]}</Text>
         </View>
         <View style={styles.row}>
           <Text style={styles.k}>Seating</Text>
-          <Text style={styles.v}>{displaySeating(r.seatingPreference)}</Text>
+          <Text style={styles.v}>{SEAT_LABEL[r.seatingPreference]}</Text>
         </View>
         <View style={styles.row}>
           <Text style={styles.k}>Booking</Text>
-          <Text style={styles.v}>{displayBooking(r.bookingType)}</Text>
+          <Text style={styles.v}>{BOOK_LABEL[r.bookingType]}</Text>
         </View>
         {r.specialRequest ? (
           <View style={styles.noteBlock}>
@@ -179,6 +194,7 @@ export function ReservationsScreen(_props: Props) {
     <FlatList
       data={reservations}
       keyExtractor={(item) => item.id}
+      style={styles.list}
       renderItem={renderItem}
       contentContainerStyle={
         reservations.length === 0
@@ -198,6 +214,7 @@ export function ReservationsScreen(_props: Props) {
 }
 
 const styles = StyleSheet.create({
+  list: { flex: 1, backgroundColor: '#f1f5f9' },
   listContent: { padding: 16, paddingBottom: 32 },
   listContentEmpty: { flexGrow: 1 },
   emptyInner: {
@@ -207,7 +224,7 @@ const styles = StyleSheet.create({
   },
   centered: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
@@ -230,11 +247,16 @@ const styles = StyleSheet.create({
   retryBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   card: {
     backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 16,
+    borderRadius: 12,
+    padding: 18,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     marginBottom: 12,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -243,15 +265,16 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 6,
   },
-  titleBlock: { flex: 1 },
-  placeName: { fontSize: 18, fontWeight: '700', color: '#0f172a' },
-  placeLoc: { marginTop: 4, fontSize: 14, color: '#64748b' },
-  whenText: { fontSize: 15, color: '#334155', marginBottom: 10 },
+  titleBlock: { flex: 1, paddingRight: 8 },
+  placeName: { fontSize: 20, fontWeight: '800', color: '#0f172a', lineHeight: 26 },
+  placeLoc: { marginTop: 5, fontSize: 15, color: '#64748b' },
+  whenLabel: { fontSize: 12, fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 4, marginBottom: 4 },
+  whenText: { fontSize: 16, lineHeight: 24, color: '#1e293b', fontWeight: '500', marginBottom: 10 },
   row: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, gap: 12 },
   k: { fontSize: 13, color: '#64748b', fontWeight: '600' },
   v: { fontSize: 15, color: '#334155', textAlign: 'right', flex: 1, flexWrap: 'wrap' },
   noteBlock: { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
   note: { marginTop: 4, fontSize: 15, color: '#334155', lineHeight: 22 },
-  badge: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 6, alignSelf: 'flex-start' },
-  badgeText: { fontSize: 11, fontWeight: '700' },
+  badge: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, alignSelf: 'flex-start' },
+  badgeText: { fontSize: 12, fontWeight: '800' },
 });
