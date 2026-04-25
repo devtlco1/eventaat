@@ -28,7 +28,21 @@ eventaat/
 - Backend: NestJS, Prisma, PostgreSQL, JWT (bcrypt), `@Roles()` RBAC
 - Frontend (planned): Next.js (admin), React Native + Expo (mobile)
 - Monorepo: npm workspaces
-- Node.js 20+
+- Node.js 22 (see [Node 22 (local)](#node-22-local))
+
+## Node 22 (local)
+
+The repo is standardized on **Node.js 22** for local work and in Cursor. Install the toolchain with [fnm](https://github.com/Schniz/fnm) (Fast Node Manager):
+
+```bash
+brew install fnm
+eval "$(fnm env --use-on-cd)"
+fnm install 22
+fnm use 22
+node -v
+```
+
+`node -v` should show **v22.x**. Project version pins live in `.nvmrc` and `.node-version` (both: `22`); with `use-on-cd`, entering the repo can auto-select 22 if you have run `fnm install` once.
 
 ## Quick start
 

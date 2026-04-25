@@ -1,5 +1,9 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Node version
+
+The monorepo uses **Node.js 22** (root `.nvmrc` / `.node-version`). Set up [fnm](https://github.com/Schniz/fnm) and install/use 22 as described in the [root README](../../README.md#node-22-local), then from the repository root: `npm install` and `npm run dev -w @eventaat/admin`.
+
 ## Getting Started
 
 First, run the development server:

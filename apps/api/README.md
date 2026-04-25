@@ -23,7 +23,9 @@ NestJS + Prisma backend for eventaat. PostgreSQL is the database.
 
 ## Local setup
 
-From the **monorepo root** (`/Users/amjadmohammed/Documents/Claude/Projects/eventaat`):
+Use **Node.js 22** in this monorepo (root `.nvmrc` and [root README setup](../../README.md#node-22-local). Paths below assume a clone of the repository.)
+
+From the **monorepo root**:
 
 ```bash
 npm install
