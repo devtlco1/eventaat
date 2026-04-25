@@ -9,7 +9,7 @@ eventaat/
 ├── apps/
 │   ├── mobile/    # React Native + Expo customer app  (not scaffolded)
 │   ├── admin/     # Next.js dashboard                  (not scaffolded)
-│   └── api/       # NestJS + Prisma + Postgres         (Step 3)
+│   └── api/       # NestJS + Prisma + Postgres + Auth  (Step 4)
 ├── packages/
 │   └── shared/    # Shared TypeScript types/constants  (built to dist/)
 ├── package.json   # npm workspaces root
@@ -25,14 +25,12 @@ eventaat/
 ## Tech
 
 - TypeScript everywhere
-- Backend: NestJS, Prisma, PostgreSQL
+- Backend: NestJS, Prisma, PostgreSQL, JWT auth (bcrypt)
 - Frontend (planned): Next.js (admin), React Native + Expo (mobile)
 - Monorepo: npm workspaces
 - Node.js 20+
 
 ## Quick start
-
-From the repo root:
 
 ```bash
 # 1. Install everything
@@ -40,22 +38,24 @@ npm install
 
 # 2. API env
 cp apps/api/.env.example apps/api/.env
+# Edit apps/api/.env — set a real JWT_SECRET (e.g. `openssl rand -hex 32`)
 
-# 3. Start Postgres locally
+# 3. Postgres
 docker run --name eventaat-pg \
-  -e POSTGRES_USER=eventaat \
-  -e POSTGRES_PASSWORD=eventaat \
-  -e POSTGRES_DB=eventaat \
-  -p 5432:5432 -d postgres:16
+  -e POSTGRES_USER=eventaat -e POSTGRES_PASSWORD=eventaat \
+  -e POSTGRES_DB=eventaat -p 5432:5432 -d postgres:16
 
-# 4. Create + apply the first migration (User model)
+# 4. Migrate
 npm run prisma:migrate -w @eventaat/api -- --name init_user
 
-# 5. Run the API on port 4000
+# 5. Run on port 4000
 npm run dev -w @eventaat/api
 
-# 6. Health check
+# 6. Smoke tests
 curl http://localhost:4000/health
+curl -X POST http://localhost:4000/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"a@b.com","password":"supersecret","fullName":"A B"}'
 ```
 
 Per-app docs: [`apps/api/README.md`](apps/api/README.md).
@@ -63,6 +63,7 @@ Per-app docs: [`apps/api/README.md`](apps/api/README.md).
 ## Status
 
 - Step 1 — monorepo skeleton
-- Step 2 — API foundation (NestJS + `/health`)
-- Step 3 — first Prisma model (`User` + `Role`), `/health` reports DB status
-- Step 4 (next) — auth (registration + login)
+- Step 2 — API foundation (`/health`)
+- Step 3 — Prisma + `User` model + DB-aware health
+- Step 4 — auth foundation (`/auth/register`, `/auth/login`, JWT, bcrypt)
+- Step 5 (next) — restaurants
