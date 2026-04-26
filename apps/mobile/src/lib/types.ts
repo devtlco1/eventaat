@@ -29,6 +29,33 @@ export interface RestaurantDetail {
   description: string | null;
   phone: string | null;
   isActive: boolean;
+  websiteUrl: string | null;
+  menuUrl: string | null;
+  locationUrl: string | null;
+  instagramUrl: string | null;
+  coverImageUrl: string | null;
+  profileImageUrl: string | null;
+  shortDescription: string | null;
+  profileDescription: string | null;
+}
+
+export type RestaurantContactType =
+  | 'PHONE'
+  | 'WHATSAPP'
+  | 'INSTAGRAM'
+  | 'WEBSITE'
+  | 'EMAIL'
+  | 'OTHER';
+
+export interface RestaurantContact {
+  id: string;
+  restaurantId: string;
+  label: string;
+  type: RestaurantContactType;
+  value: string;
+  isPrimary: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface RestaurantOperatingSettings {

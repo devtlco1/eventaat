@@ -16,11 +16,13 @@ import {
   fetchAvailability,
   fetchOperatingSettings,
   fetchRestaurantById,
+  fetchRestaurantContacts,
 } from '../lib/api';
 import type {
   AvailabilityResponse,
   BookingType,
   GuestType,
+  RestaurantContact,
   RestaurantDetail,
   RestaurantOperatingSettings,
   SeatingPreference,
@@ -136,6 +138,7 @@ export function RestaurantDetailScreen({ route, navigation }: ScreenProps) {
   const { token, signOut } = useAuth();
 
   const [restaurant, setRestaurant] = useState<RestaurantDetail | null>(null);
+  const [contacts, setContacts] = useState<RestaurantContact[]>([]);
   const [operatingSettings, setOperatingSettings] = useState<RestaurantOperatingSettings | null>(
     null,
   );
@@ -171,11 +174,13 @@ export function RestaurantDetailScreen({ route, navigation }: ScreenProps) {
     setLoadError(null);
     setLoadPending(true);
     try {
-      const [data, settings] = await Promise.all([
+      const [data, cList, settings] = await Promise.all([
         fetchRestaurantById(token, restaurantId),
+        fetchRestaurantContacts(token, restaurantId),
         fetchOperatingSettings(token, restaurantId),
       ]);
       setRestaurant(data);
+      setContacts(cList);
       setOperatingSettings(settings);
       setDurationStr(String(settings.defaultReservationDurationMinutes));
       navigation.setOptions({ title: data.name });
@@ -183,6 +188,7 @@ export function RestaurantDetailScreen({ route, navigation }: ScreenProps) {
       const msg = e instanceof Error ? e.message : 'Failed to load restaurant';
       setLoadError(msg);
       setRestaurant(null);
+      setContacts([]);
       setOperatingSettings(null);
       if (msg.includes('401')) {
         void signOut();
@@ -309,6 +315,27 @@ export function RestaurantDetailScreen({ route, navigation }: ScreenProps) {
 
   const acceptsReservations = operatingSettings?.acceptsReservations !== false;
 
+  const linkLines: { k: string; v: string }[] = [];
+  if (restaurant.websiteUrl?.trim()) {
+    linkLines.push({ k: 'Website', v: restaurant.websiteUrl.trim() });
+  }
+  if (restaurant.menuUrl?.trim()) {
+    linkLines.push({ k: 'Menu', v: restaurant.menuUrl.trim() });
+  }
+  if (restaurant.instagramUrl?.trim()) {
+    linkLines.push({ k: 'Instagram', v: restaurant.instagramUrl.trim() });
+  }
+  if (restaurant.locationUrl?.trim()) {
+    linkLines.push({ k: 'Location', v: restaurant.locationUrl.trim() });
+  }
+  if (restaurant.coverImageUrl?.trim()) {
+    linkLines.push({ k: 'Cover image URL', v: restaurant.coverImageUrl.trim() });
+  }
+  if (restaurant.profileImageUrl?.trim()) {
+    linkLines.push({ k: 'Profile image URL', v: restaurant.profileImageUrl.trim() });
+  }
+  const hasProfileExtra = linkLines.length > 0 || contacts.length > 0;
+
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
       <Text style={styles.pageSectionLabel}>Restaurant</Text>
@@ -323,7 +350,37 @@ export function RestaurantDetailScreen({ route, navigation }: ScreenProps) {
         {restaurant.description ? (
           <Text style={styles.description}>{restaurant.description}</Text>
         ) : null}
+        {restaurant.shortDescription ? (
+          <Text style={styles.description}>{restaurant.shortDescription}</Text>
+        ) : null}
+        {restaurant.profileDescription ? (
+          <Text style={styles.description}>{restaurant.profileDescription}</Text>
+        ) : null}
       </View>
+
+      {hasProfileExtra ? (
+        <>
+          <Text style={styles.pageSectionLabelMuted}>About &amp; contact</Text>
+          <View style={styles.cardMuted}>
+            {linkLines.map((row, i) => (
+              <Text key={`${row.k}-${i}`} style={styles.mutedCallout}>
+                {row.k}: {row.v}
+              </Text>
+            ))}
+            {contacts.length > 0 ? (
+              <>
+                <Text style={styles.mutedCallout}>Contacts</Text>
+                {contacts.map((c) => (
+                  <Text key={c.id} style={styles.contactLine}>
+                    {c.label} ({c.type}
+                    {c.isPrimary ? ', primary' : ''}): {c.value}
+                  </Text>
+                ))}
+              </>
+            ) : null}
+          </View>
+        </>
+      ) : null}
 
       {operatingSettings && !operatingSettings.acceptsReservations ? (
         <View style={styles.noticeCard} accessibilityRole="alert">
@@ -718,6 +775,7 @@ const styles = StyleSheet.create({
   },
   ghostBtnText: { color: '#2563eb', fontSize: 15, fontWeight: '600' },
   mutedCallout: { fontSize: 14, color: '#64748b', lineHeight: 21, marginBottom: 12 },
+  contactLine: { fontSize: 14, color: '#475569', lineHeight: 20, marginBottom: 6 },
   errorBox: { marginBottom: 12 },
   errorBanner: { color: '#b91c1c', fontSize: 15, lineHeight: 22 },
   slotsBlock: { gap: 12, marginTop: 4, marginBottom: 8 },

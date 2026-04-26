@@ -47,6 +47,16 @@ enum ReservationStatus {
   COMPLETED
 }
 
+/// Public-facing contact or social entry for a restaurant.
+enum RestaurantContactType {
+  PHONE
+  WHATSAPP
+  INSTAGRAM
+  WEBSITE
+  EMAIL
+  OTHER
+}
+
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
@@ -76,6 +86,15 @@ model Restaurant {
   latitude    Decimal? @db.Decimal(10, 7)
   longitude   Decimal? @db.Decimal(10, 7)
   isActive    Boolean  @default(true) @map("is_active")
+  /// Optional public URLs and copy (file URLs until uploads exist).
+  websiteUrl        String? @map("website_url") @db.VarChar(2048)
+  menuUrl           String? @map("menu_url") @db.VarChar(2048)
+  locationUrl       String? @map("location_url") @db.VarChar(2048)
+  instagramUrl      String? @map("instagram_url") @db.VarChar(2048)
+  coverImageUrl     String? @map("cover_image_url") @db.VarChar(2048)
+  profileImageUrl   String? @map("profile_image_url") @db.VarChar(2048)
+  shortDescription  String? @map("short_description")
+  profileDescription String? @map("profile_description")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -85,6 +104,7 @@ model Restaurant {
 
   operatingSettings RestaurantOperatingSettings?
   openingHours     RestaurantOpeningHour[]
+  contacts         RestaurantContact[]
 
   @@map("restaurants")
 }
@@ -126,6 +146,24 @@ model RestaurantOpeningHour {
   @@unique([restaurantId, dayOfWeek])
   @@index([restaurantId])
   @@map("restaurant_opening_hours")
+}
+
+/// Structured contact for profile; at most one primary per (restaurant, type) via service.
+model RestaurantContact {
+  id           String  @id @default(uuid()) @db.Uuid
+  restaurantId String  @map("restaurant_id") @db.Uuid
+  label        String
+  type         RestaurantContactType
+  value        String
+  isPrimary    Boolean @default(false) @map("is_primary")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([restaurantId, type])
+  @@map("restaurant_contacts")
 }
 
 model RestaurantTable {

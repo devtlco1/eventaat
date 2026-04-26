@@ -12,6 +12,8 @@ import {
   RestaurantAdmin,
   Reservation,
   ReservationStatus,
+  RestaurantContact,
+  RestaurantContactType,
   RestaurantTable,
   Role,
   RestaurantOperatingSettings,
@@ -29,6 +31,9 @@ import { UpdateRestaurantTableDto } from './dto/update-restaurant-table.dto';
 import { UpdateOperatingSettingsDto } from './dto/update-operating-settings.dto';
 import { UpdateOpeningHoursDto } from './dto/update-opening-hours.dto';
 import { CancelMyReservationDto } from './dto/cancel-my-reservation.dto';
+import { CreateRestaurantContactDto } from './dto/create-restaurant-contact.dto';
+import { UpdateRestaurantContactDto } from './dto/update-restaurant-contact.dto';
+import { UpdateRestaurantProfileDto } from './dto/update-restaurant-profile.dto';
 import {
   computeOpenCloseForLocalDay,
   hhMmToMinutes,
@@ -503,6 +508,234 @@ export class RestaurantsService {
       });
     });
     return this.getOpeningHours(restaurantId, actor);
+  }
+
+  // ─── Public profile (URLs, copy) & contacts ───────────────────────────────
+
+  private static profileField(
+    v: string | undefined,
+  ): string | null | undefined {
+    if (v === undefined) return undefined;
+    const t = v.trim();
+    return t.length === 0 ? null : t;
+  }
+
+  private async clearOtherPrimaryContactsInTx(
+    tx: Prisma.TransactionClient,
+    restaurantId: string,
+    type: RestaurantContactType,
+    exceptContactId?: string,
+  ): Promise<void> {
+    const where: Prisma.RestaurantContactWhereInput = { restaurantId, type };
+    if (exceptContactId) {
+      where.id = { not: exceptContactId };
+    }
+    await tx.restaurantContact.updateMany({
+      where,
+      data: { isPrimary: false },
+    });
+  }
+
+  async getRestaurantProfile(
+    restaurantId: string,
+    viewer: SafeUser,
+  ): Promise<{
+    id: string;
+    websiteUrl: string | null;
+    menuUrl: string | null;
+    locationUrl: string | null;
+    instagramUrl: string | null;
+    coverImageUrl: string | null;
+    profileImageUrl: string | null;
+    shortDescription: string | null;
+    profileDescription: string | null;
+  }> {
+    await this.assertCanViewOperatingSettings(viewer, restaurantId);
+    const r = await this.prisma.restaurant.findUnique({
+      where: { id: restaurantId },
+      select: {
+        id: true,
+        websiteUrl: true,
+        menuUrl: true,
+        locationUrl: true,
+        instagramUrl: true,
+        coverImageUrl: true,
+        profileImageUrl: true,
+        shortDescription: true,
+        profileDescription: true,
+      },
+    });
+    if (!r) {
+      throw new NotFoundException('Restaurant not found');
+    }
+    return r;
+  }
+
+  async updateRestaurantProfile(
+    restaurantId: string,
+    dto: UpdateRestaurantProfileDto,
+    actor: SafeUser,
+  ): Promise<{
+    id: string;
+    websiteUrl: string | null;
+    menuUrl: string | null;
+    locationUrl: string | null;
+    instagramUrl: string | null;
+    coverImageUrl: string | null;
+    profileImageUrl: string | null;
+    shortDescription: string | null;
+    profileDescription: string | null;
+  }> {
+    await this.assertCanManageRestaurant(actor, restaurantId);
+    const data: Prisma.RestaurantUpdateInput = {};
+    const w = RestaurantsService.profileField(dto.websiteUrl);
+    if (w !== undefined) data.websiteUrl = w;
+    const m = RestaurantsService.profileField(dto.menuUrl);
+    if (m !== undefined) data.menuUrl = m;
+    const l = RestaurantsService.profileField(dto.locationUrl);
+    if (l !== undefined) data.locationUrl = l;
+    const i = RestaurantsService.profileField(dto.instagramUrl);
+    if (i !== undefined) data.instagramUrl = i;
+    const c = RestaurantsService.profileField(dto.coverImageUrl);
+    if (c !== undefined) data.coverImageUrl = c;
+    const p = RestaurantsService.profileField(dto.profileImageUrl);
+    if (p !== undefined) data.profileImageUrl = p;
+    const sd = RestaurantsService.profileField(dto.shortDescription);
+    if (sd !== undefined) data.shortDescription = sd;
+    const pd = RestaurantsService.profileField(dto.profileDescription);
+    if (pd !== undefined) data.profileDescription = pd;
+    if (Object.keys(data).length === 0) {
+      return this.getRestaurantProfile(restaurantId, actor);
+    }
+    await this.prisma.restaurant.update({
+      where: { id: restaurantId },
+      data,
+    });
+    return this.getRestaurantProfile(restaurantId, actor);
+  }
+
+  async getRestaurantContacts(
+    restaurantId: string,
+    viewer: SafeUser,
+  ): Promise<RestaurantContact[]> {
+    await this.assertCanViewOperatingSettings(viewer, restaurantId);
+    return this.prisma.restaurantContact.findMany({
+      where: { restaurantId },
+      orderBy: [{ isPrimary: 'desc' }, { label: 'asc' }, { id: 'asc' }],
+    });
+  }
+
+  async createRestaurantContact(
+    restaurantId: string,
+    dto: CreateRestaurantContactDto,
+    actor: SafeUser,
+  ): Promise<RestaurantContact> {
+    await this.assertCanManageRestaurant(actor, restaurantId);
+    const isPrimary = dto.isPrimary === true;
+    return this.prisma.$transaction(async (tx) => {
+      if (isPrimary) {
+        await this.clearOtherPrimaryContactsInTx(
+          tx,
+          restaurantId,
+          dto.type,
+        );
+      }
+      return tx.restaurantContact.create({
+        data: {
+          restaurantId,
+          label: dto.label.trim(),
+          type: dto.type,
+          value: dto.value.trim(),
+          isPrimary,
+        },
+      });
+    });
+  }
+
+  async updateRestaurantContact(
+    restaurantId: string,
+    contactId: string,
+    dto: UpdateRestaurantContactDto,
+    actor: SafeUser,
+  ): Promise<RestaurantContact> {
+    await this.assertCanManageRestaurant(actor, restaurantId);
+    const existing = await this.prisma.restaurantContact.findFirst({
+      where: { id: contactId, restaurantId },
+    });
+    if (!existing) {
+      throw new NotFoundException('Contact not found');
+    }
+    const nextType: RestaurantContactType = dto.type ?? existing.type;
+    const nextIsPrimary = dto.isPrimary === true;
+    if (dto.isPrimary === false) {
+      return this.prisma.restaurantContact.update({
+        where: { id: contactId },
+        data: {
+          ...(dto.label !== undefined
+            ? { label: dto.label.trim() }
+            : {}),
+          ...(dto.value !== undefined ? { value: dto.value.trim() } : {}),
+          ...(dto.type !== undefined ? { type: dto.type } : {}),
+          isPrimary: false,
+        },
+      });
+    }
+    if (nextIsPrimary) {
+      return this.prisma.$transaction(async (tx) => {
+        await this.clearOtherPrimaryContactsInTx(
+          tx,
+          restaurantId,
+          nextType,
+          contactId,
+        );
+        return tx.restaurantContact.update({
+          where: { id: contactId },
+          data: {
+            ...(dto.label !== undefined
+              ? { label: dto.label.trim() }
+              : {}),
+            ...(dto.value !== undefined
+              ? { value: dto.value.trim() }
+              : {}),
+            ...(dto.type !== undefined ? { type: dto.type } : {}),
+            isPrimary: true,
+          },
+        });
+      });
+    }
+    const noPrimaryPatch: {
+      label?: string;
+      value?: string;
+      type?: RestaurantContactType;
+    } = {
+      ...(dto.label !== undefined
+        ? { label: dto.label.trim() }
+        : {}),
+      ...(dto.value !== undefined ? { value: dto.value.trim() } : {}),
+      ...(dto.type !== undefined ? { type: dto.type } : {}),
+    };
+    if (Object.keys(noPrimaryPatch).length === 0) {
+      return existing;
+    }
+    return this.prisma.restaurantContact.update({
+      where: { id: contactId },
+      data: noPrimaryPatch,
+    });
+  }
+
+  async deleteRestaurantContact(
+    restaurantId: string,
+    contactId: string,
+    actor: SafeUser,
+  ): Promise<void> {
+    await this.assertCanManageRestaurant(actor, restaurantId);
+    const existing = await this.prisma.restaurantContact.findFirst({
+      where: { id: contactId, restaurantId },
+    });
+    if (!existing) {
+      throw new NotFoundException('Contact not found');
+    }
+    await this.prisma.restaurantContact.delete({ where: { id: contactId } });
   }
 
   private async assertReservationMeetsOperatingRules(

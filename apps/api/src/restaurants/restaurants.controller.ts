@@ -15,6 +15,7 @@ import {
 import {
   Restaurant,
   RestaurantAdmin,
+  RestaurantContact,
   Reservation,
   RestaurantTable,
 } from '@prisma/client';
@@ -28,7 +29,10 @@ import { AssignAdminDto } from './dto/assign-admin.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { CreateRestaurantDto } from './dto/create-restaurant.dto';
 import { CreateRestaurantTableDto } from './dto/create-restaurant-table.dto';
+import { CreateRestaurantContactDto } from './dto/create-restaurant-contact.dto';
 import { UpdateReservationStatusDto } from './dto/update-reservation-status.dto';
+import { UpdateRestaurantContactDto } from './dto/update-restaurant-contact.dto';
+import { UpdateRestaurantProfileDto } from './dto/update-restaurant-profile.dto';
 import { UpdateRestaurantDto } from './dto/update-restaurant.dto';
 import { UpdateRestaurantTableDto } from './dto/update-restaurant-table.dto';
 import { UpdateOpeningHoursDto } from './dto/update-opening-hours.dto';
@@ -104,6 +108,73 @@ export class RestaurantsController {
     @CurrentUser() user: SafeUser,
   ) {
     return this.restaurants.updateOpeningHours(restaurantId, dto, user);
+  }
+
+  @Get(':restaurantId/profile')
+  getRestaurantProfile(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @CurrentUser() user: SafeUser,
+  ) {
+    return this.restaurants.getRestaurantProfile(restaurantId, user);
+  }
+
+  @Patch(':restaurantId/profile')
+  @Roles('PLATFORM_ADMIN', 'RESTAURANT_ADMIN')
+  patchRestaurantProfile(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @Body() dto: UpdateRestaurantProfileDto,
+    @CurrentUser() user: SafeUser,
+  ) {
+    return this.restaurants.updateRestaurantProfile(restaurantId, dto, user);
+  }
+
+  @Get(':restaurantId/contacts')
+  getRestaurantContacts(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @CurrentUser() user: SafeUser,
+  ) {
+    return this.restaurants.getRestaurantContacts(restaurantId, user);
+  }
+
+  @Post(':restaurantId/contacts')
+  @Roles('PLATFORM_ADMIN', 'RESTAURANT_ADMIN')
+  createRestaurantContact(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @Body() dto: CreateRestaurantContactDto,
+    @CurrentUser() user: SafeUser,
+  ): Promise<RestaurantContact> {
+    return this.restaurants.createRestaurantContact(restaurantId, dto, user);
+  }
+
+  @Patch(':restaurantId/contacts/:contactId')
+  @Roles('PLATFORM_ADMIN', 'RESTAURANT_ADMIN')
+  updateRestaurantContact(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @Param('contactId', new ParseUUIDPipe()) contactId: string,
+    @Body() dto: UpdateRestaurantContactDto,
+    @CurrentUser() user: SafeUser,
+  ): Promise<RestaurantContact> {
+    return this.restaurants.updateRestaurantContact(
+      restaurantId,
+      contactId,
+      dto,
+      user,
+    );
+  }
+
+  @Delete(':restaurantId/contacts/:contactId')
+  @Roles('PLATFORM_ADMIN', 'RESTAURANT_ADMIN')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteRestaurantContact(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @Param('contactId', new ParseUUIDPipe()) contactId: string,
+    @CurrentUser() user: SafeUser,
+  ): Promise<void> {
+    return this.restaurants.deleteRestaurantContact(
+      restaurantId,
+      contactId,
+      user,
+    );
   }
 
   @Get(':id')

@@ -5,6 +5,7 @@ import type {
   MyReservation,
   ReservationRecord,
   Restaurant,
+  RestaurantContact,
   RestaurantDetail,
   RestaurantOperatingSettings,
 } from './types';
@@ -81,6 +82,26 @@ export async function fetchRestaurantById(
     throw new Error(message);
   }
   return res.json() as Promise<RestaurantDetail>;
+}
+
+export async function fetchRestaurantContacts(
+  accessToken: string,
+  restaurantId: string,
+): Promise<RestaurantContact[]> {
+  const res = await fetch(`${baseUrl()}/restaurants/${restaurantId}/contacts`, {
+    headers: authHeaders(accessToken),
+  });
+  if (res.status === 401) {
+    throw new Error('Unauthorized (401) — sign in again.');
+  }
+  if (!res.ok) {
+    const message = await readErrorMessage(
+      res,
+      `Request failed (${res.status})`,
+    );
+    throw new Error(message);
+  }
+  return res.json() as Promise<RestaurantContact[]>;
 }
 
 export async function fetchOperatingSettings(

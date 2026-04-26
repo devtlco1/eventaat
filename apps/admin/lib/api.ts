@@ -87,6 +87,14 @@ export type Restaurant = {
   latitude: string | null;
   longitude: string | null;
   isActive: boolean;
+  websiteUrl: string | null;
+  menuUrl: string | null;
+  locationUrl: string | null;
+  instagramUrl: string | null;
+  coverImageUrl: string | null;
+  profileImageUrl: string | null;
+  shortDescription: string | null;
+  profileDescription: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -432,5 +440,120 @@ export function updateOpeningHours(
     `/restaurants/${restaurantId}/opening-hours`,
     { method: 'PATCH', token, body: JSON.stringify({ days }) },
   );
+}
+
+export type RestaurantProfile = {
+  id: string;
+  websiteUrl: string | null;
+  menuUrl: string | null;
+  locationUrl: string | null;
+  instagramUrl: string | null;
+  coverImageUrl: string | null;
+  profileImageUrl: string | null;
+  shortDescription: string | null;
+  profileDescription: string | null;
+};
+
+export function getRestaurantProfile(
+  token: string,
+  restaurantId: string,
+): Promise<RestaurantProfile> {
+  return apiRequest<RestaurantProfile>(
+    `/restaurants/${restaurantId}/profile`,
+    { method: 'GET', token },
+  );
+}
+
+export function updateRestaurantProfile(
+  token: string,
+  restaurantId: string,
+  input: Partial<{
+    websiteUrl: string;
+    menuUrl: string;
+    locationUrl: string;
+    instagramUrl: string;
+    coverImageUrl: string;
+    profileImageUrl: string;
+    shortDescription: string;
+    profileDescription: string;
+  }>,
+): Promise<RestaurantProfile> {
+  return apiRequest<RestaurantProfile>(
+    `/restaurants/${restaurantId}/profile`,
+    { method: 'PATCH', token, body: JSON.stringify(input) },
+  );
+}
+
+export type RestaurantContactType =
+  | 'PHONE'
+  | 'WHATSAPP'
+  | 'INSTAGRAM'
+  | 'WEBSITE'
+  | 'EMAIL'
+  | 'OTHER';
+
+export type RestaurantContact = {
+  id: string;
+  restaurantId: string;
+  label: string;
+  type: RestaurantContactType;
+  value: string;
+  isPrimary: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function getRestaurantContacts(
+  token: string,
+  restaurantId: string,
+): Promise<RestaurantContact[]> {
+  return apiRequest<RestaurantContact[]>(
+    `/restaurants/${restaurantId}/contacts`,
+    { method: 'GET', token },
+  );
+}
+
+export function createRestaurantContact(
+  token: string,
+  restaurantId: string,
+  input: {
+    label: string;
+    type: RestaurantContactType;
+    value: string;
+    isPrimary?: boolean;
+  },
+): Promise<RestaurantContact> {
+  return apiRequest<RestaurantContact>(
+    `/restaurants/${restaurantId}/contacts`,
+    { method: 'POST', token, body: JSON.stringify(input) },
+  );
+}
+
+export function updateRestaurantContact(
+  token: string,
+  restaurantId: string,
+  contactId: string,
+  input: Partial<{
+    label: string;
+    type: RestaurantContactType;
+    value: string;
+    isPrimary: boolean;
+  }>,
+): Promise<RestaurantContact> {
+  return apiRequest<RestaurantContact>(
+    `/restaurants/${restaurantId}/contacts/${contactId}`,
+    { method: 'PATCH', token, body: JSON.stringify(input) },
+  );
+}
+
+export function deleteRestaurantContact(
+  token: string,
+  restaurantId: string,
+  contactId: string,
+): Promise<void> {
+  return apiRequest<void>(`/restaurants/${restaurantId}/contacts/${contactId}`, {
+    method: 'DELETE',
+    token,
+  });
 }
 
