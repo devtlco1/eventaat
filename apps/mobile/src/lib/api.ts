@@ -2,6 +2,7 @@ import type {
   AuthLoginResponse,
   AvailabilityResponse,
   CreateReservationRequestBody,
+  MyEventReservation,
   MyReservation,
   ReservationRecord,
   Restaurant,
@@ -307,4 +308,82 @@ export async function fetchMyReservations(
     throw new Error(message);
   }
   return res.json() as Promise<MyReservation[]>;
+}
+
+export type CreateEventReservationBody = { partySize: number; specialRequest?: string };
+
+export async function createEventReservationRequest(
+  accessToken: string,
+  restaurantId: string,
+  eventId: string,
+  body: CreateEventReservationBody,
+): Promise<MyEventReservation> {
+  const res = await fetch(
+    `${baseUrl()}/restaurants/${restaurantId}/events/${eventId}/reservations`,
+    {
+      method: 'POST',
+      headers: { ...authHeaders(accessToken), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        partySize: body.partySize,
+        ...(body.specialRequest?.trim() ? { specialRequest: body.specialRequest.trim() } : {}),
+      }),
+    },
+  );
+  if (res.status === 401) {
+    throw new Error('Unauthorized (401) — sign in again.');
+  }
+  if (!res.ok) {
+    const message = await readErrorMessage(
+      res,
+      `Could not request event spot (${res.status})`,
+    );
+    throw new Error(message);
+  }
+  return res.json() as Promise<MyEventReservation>;
+}
+
+export async function fetchMyEventReservations(
+  accessToken: string,
+): Promise<MyEventReservation[]> {
+  const res = await fetch(`${baseUrl()}/me/event-reservations`, {
+    method: 'GET',
+    headers: authHeaders(accessToken),
+  });
+  if (res.status === 401) {
+    throw new Error('Unauthorized (401) — sign in again.');
+  }
+  if (!res.ok) {
+    const message = await readErrorMessage(
+      res,
+      `Could not load event reservations (${res.status})`,
+    );
+    throw new Error(message);
+  }
+  return res.json() as Promise<MyEventReservation[]>;
+}
+
+export async function cancelMyEventReservation(
+  accessToken: string,
+  eventReservationId: string,
+  body: CancelMyReservationBody = {},
+): Promise<MyEventReservation> {
+  const res = await fetch(
+    `${baseUrl()}/me/event-reservations/${encodeURIComponent(eventReservationId)}/cancel`,
+    {
+      method: 'PATCH',
+      headers: { ...authHeaders(accessToken), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ note: body.note }),
+    },
+  );
+  if (res.status === 401) {
+    throw new Error('Unauthorized (401) — sign in again.');
+  }
+  if (!res.ok) {
+    const message = await readErrorMessage(
+      res,
+      `Could not cancel event reservation (${res.status})`,
+    );
+    throw new Error(message);
+  }
+  return res.json() as Promise<MyEventReservation>;
 }

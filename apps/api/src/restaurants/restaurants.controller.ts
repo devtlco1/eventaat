@@ -35,12 +35,16 @@ import { UpdateRestaurantContactDto } from './dto/update-restaurant-contact.dto'
 import { UpdateRestaurantProfileDto } from './dto/update-restaurant-profile.dto';
 import { CreateRestaurantEventDto } from './dto/create-restaurant-event.dto';
 import { ListRestaurantEventsQueryDto } from './dto/list-restaurant-events-query.dto';
+import { CreateEventReservationDto } from './dto/create-event-reservation.dto';
+import { ListEventReservationsQueryDto } from './dto/list-event-reservations-query.dto';
 import { UpdateRestaurantEventDto } from './dto/update-restaurant-event.dto';
+import { UpdateEventReservationStatusDto } from './dto/update-event-reservation-status.dto';
 import { ReviewRestaurantEventDto } from './dto/review-restaurant-event.dto';
 import { UpdateRestaurantDto } from './dto/update-restaurant.dto';
 import { UpdateRestaurantTableDto } from './dto/update-restaurant-table.dto';
 import { UpdateOpeningHoursDto } from './dto/update-opening-hours.dto';
 import { UpdateOperatingSettingsDto } from './dto/update-operating-settings.dto';
+import { EventReservationService } from './event-reservation.service';
 import { RestaurantsService } from './restaurants.service';
 
 /**
@@ -51,7 +55,10 @@ import { RestaurantsService } from './restaurants.service';
 @Controller('restaurants')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class RestaurantsController {
-  constructor(private readonly restaurants: RestaurantsService) {}
+  constructor(
+    private readonly restaurants: RestaurantsService,
+    private readonly eventReservations: EventReservationService,
+  ) {}
 
   // ─── Core CRUD ─────────────────────────────────────────────────────────────
 
@@ -254,6 +261,60 @@ export class RestaurantsController {
     return this.restaurants.deactivateRestaurantEvent(
       restaurantId,
       eventId,
+      user,
+    );
+  }
+
+  /**
+   * POST /restaurants/:restaurantId/events/:eventId/reservations
+   * Event booking request; starts PENDING (CUSTOMER only).
+   */
+  @Post(':restaurantId/events/:eventId/reservations')
+  @Roles('CUSTOMER')
+  createEventReservation(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @Param('eventId', new ParseUUIDPipe()) eventId: string,
+    @Body() dto: CreateEventReservationDto,
+    @CurrentUser() user: SafeUser,
+  ) {
+    return this.eventReservations.createEventReservation(
+      restaurantId,
+      eventId,
+      dto,
+      user,
+    );
+  }
+
+  /**
+   * GET /restaurants/:restaurantId/event-reservations?eventId=
+   * List event booking requests; PLATFORM or assigned RESTAURANT admin.
+   */
+  @Get(':restaurantId/event-reservations')
+  @Roles('PLATFORM_ADMIN', 'RESTAURANT_ADMIN')
+  listEventReservations(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @Query() query: ListEventReservationsQueryDto,
+    @CurrentUser() user: SafeUser,
+  ) {
+    return this.eventReservations.listRestaurantEventReservations(
+      restaurantId,
+      user,
+      query.eventId,
+    );
+  }
+
+  @Patch(':restaurantId/event-reservations/:eventReservationId/status')
+  @Roles('PLATFORM_ADMIN', 'RESTAURANT_ADMIN')
+  updateEventReservationStatus(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @Param('eventReservationId', new ParseUUIDPipe()) eventReservationId: string,
+    @Body() dto: UpdateEventReservationStatusDto,
+    @CurrentUser() user: SafeUser,
+  ) {
+    return this.eventReservations.updateEventReservationStatus(
+      restaurantId,
+      eventReservationId,
+      dto,
       user,
     );
   }

@@ -192,3 +192,41 @@ export type MyReservation = ReservationRecord & {
   /** Omitted on older API versions. */
   statusHistory?: ReservationStatusChangeSummary[];
 };
+
+export type EventReservationStatus = 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'CANCELLED';
+
+export type EventReservationStatusChangeSummary = {
+  id: string;
+  fromStatus: EventReservationStatus | null;
+  toStatus: EventReservationStatus;
+  note: string | null;
+  createdAt: string;
+};
+
+/** Event night booking request — distinct from table reservations. */
+export type MyEventReservation = {
+  id: string;
+  customerId: string;
+  restaurantId: string;
+  eventId: string;
+  partySize: number;
+  status: EventReservationStatus;
+  specialRequest: string | null;
+  rejectionReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  restaurant: {
+    id: string;
+    name: string;
+    city: string;
+    area: string | null;
+  };
+  event: {
+    id: string;
+    title: string;
+    startsAt: string;
+    endsAt: string;
+    capacity: number | null;
+  };
+  statusHistory?: EventReservationStatusChangeSummary[];
+};

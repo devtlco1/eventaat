@@ -78,10 +78,11 @@ The following **exist in the current rebuilt system** and form the base for all 
 | **Restaurants** | CRUD (platform), listing, detail; active flag. |
 | **Restaurant admin assignments** | Many-to-many link: which `RESTAURANT_ADMIN` manages which restaurant. |
 | **Request-based reservations** | `tableId` optional; rich request fields; status workflow. |
-| **Event nights (foundation)** | `RestaurantEvent` with **PENDING** → **APPROVED/REJECTED** by **platform**; **customers** see only **APPROVED**, **active**, **upcoming** events. **Event booking** (reservations for an event) is not implemented yet. |
-| **Mobile customer app** | Expo: **Home** is **events-first**, then **restaurants**; **Event detail** vs **Restaurant detail** are separate entry points (no mixed booking context). **Table reservation request** form only on **Restaurant detail**; **Event detail** shows a disabled / “coming soon” event booking CTA until a dedicated event reservation step ships. **My Reservations** for table requests. |
-| **Admin dashboard** | Next.js: restaurants, tables, users, admin assignments, **per-restaurant events** (create, edit, review, deactivate), **per-restaurant reservations** with status actions. |
-| **My Reservations** | Customer list with embedded restaurant (and related data from API) and status. |
+| **Event nights (foundation)** | `RestaurantEvent` with **PENDING** → **APPROVED/REJECTED** by **platform**; **customers** see only **APPROVED**, **active**, **upcoming** events. |
+| **Event reservations (booking for an event night)** | **Separate** from table reservations: `EventReservation` links `customerId`, `restaurantId`, and `eventId`. New requests start **PENDING**; **restaurant** (or platform) **CONFIRM** or **REJECT**; **capacity** (when set on the event) is enforced on **confirm** (only **CONFIRMED** party sizes count; **PENDING/REJECTED/CANCELLED** do not). No payment, no image upload. |
+| **Mobile customer app** | Expo: **Home** is **events-first**, then **restaurants**; **Event detail** (event request: party + optional note) vs **Restaurant detail** (table request) are separate. **My Reservations** lists **EVENT** and **TABLE** sections. |
+| **Admin dashboard** | Next.js: restaurants, tables, users, admin assignments, **per-restaurant events**, **per-restaurant table reservations** and a separate **per-restaurant event reservations** list with confirm/reject. |
+| **My Reservations** | Customer list: **event** requests and **table** requests, clearly separated. |
 | **Reservation status management** | Admins can move requests through the business states (see [§5](#5-reservation-lifecycle)). |
 
 **Architecture note:** Monorepo with API (NestJS + Prisma + PostgreSQL), admin web app, and mobile app; **this blueprint does not prescribe file layout**—only product behavior and phased priorities.
@@ -236,7 +237,7 @@ Events that should eventually notify users (push/email/SMS TBD):
 | **Review reservation requests** | Yes (per assigned restaurant) | — |
 | **Hold / confirm / reject / complete** | Yes (per product policy) | Stricter lifecycle rules in Phase 2 |
 | **Restaurant profile** | Basic fields | [§7](#7-restaurant-profile-future-modules) |
-| **Events / offers** | [§8](#8-event-nights--special-events-foundation-started): create events, **platform review**, customer visibility; **not** event booking | [§9](#9-offers-module-future) and richer events |
+| **Events / offers** | [§8](#8-event-nights--special-events-foundation-started): create events, **platform review**, **event reservation requests** (separate from table flow), customer visibility | [§9](#9-offers-module-future) and richer events |
 
 ---
 
@@ -244,9 +245,9 @@ Events that should eventually notify users (push/email/SMS TBD):
 
 | Stage | Capabilities |
 |-------|----------------|
-| **Now (MVP)** | Register / login, **Home** (events then restaurants), **Event detail** (browse only; event booking TBD), **Restaurant detail** + **submit table reservation request**, **My Reservations** with status. |
+| **Now (MVP)** | Register / login, **Home** (events then restaurants), **Event detail** + **event reservation request** (separate from table booking), **Restaurant detail** + **table reservation request**, **My Reservations** (EVENT and TABLE). |
 | **Next** | Clearer **history** and **lifecycle** transparency (align with Phase 2). |
-| **Later** | **Event booking**, broad **offers** surfacing, **favorites**, **rich discovery**. (Approved event nights are listed on restaurant detail today; no event-specific booking yet.) |
+| **Later** | broad **offers** surfacing, **favorites**, **rich discovery**. |
 
 **Journey summary:** *find* → *request* → *track* → (future) *engage* with events and offers.
 
@@ -259,7 +260,7 @@ Events that should eventually notify users (push/email/SMS TBD):
 | **1** | **Reservation MVP** | Request-based model, mobile + admin, status workflow | **Largely complete** |
 | **2** | **Lifecycle hardening + history** | Status transition rules, audit or history records, better admin/customer visibility | **Next major engineering** |
 | **3** | **Restaurant profile completeness** | Photos, hours, links, tags—feeds discovery |
-| **4** | **Events / event nights** | **Foundation:** event entities, **platform approval**, customer list — **in progress; event booking** remains in this phase |
+| **4** | **Events / event nights** | Event entities, **platform approval**, customer list, **event reservations** (request/approve, capacity on confirm) — *foundation + booking* |
 | **5** | **Offers** | Content + basic surfacing |
 | **6** | **Discovery + favorites** | Filters, saved list |
 | **7** | **Notifications** | Timely, consented, reliable |
@@ -271,7 +272,9 @@ Phases 3–8 can be **partially parallel** where dependencies allow, but **lifec
 
 ## 17. Next Recommended Engineering Step
 
-**Recommended: Step 26 — Reservation status history and lifecycle hardening**
+**Status:** reservation history and a dedicated **event reservation** flow (separate from table reservations) are implemented; see API and mobile behavior above.
+
+**Previously recommended: Step 26 — Reservation status history and lifecycle hardening** (largely addressed; further hardening remains in Phase 2)
 
 **Why this before events/offers:**
 

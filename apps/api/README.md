@@ -46,6 +46,20 @@ Under each restaurant, scoped routes (all require Bearer; **customers** get **ap
 - `GET|PATCH|DELETE /restaurants/:restaurantId/events/:eventId` — get / update / soft-deactivate (DELETE sets `isActive=false`; it does not remove the row).
 - `PATCH /restaurants/:restaurantId/events/:eventId/review` — `APPROVE` or `REJECT` **PENDING** only (platform only).
 
+### Event reservations (booking for a specific event)
+
+These are **not** the same as table reservations: each row is tied to `eventId` + `restaurantId` + `customerId`. A new request starts **PENDING**; a **restaurant** or **platform** admin can **CONFIRM** or **REJECT**. If the event has a `capacity`, confirmation checks that the sum of **CONFIRMED** `partySize` would not exceed it (pending and rejected requests do not consume capacity). Migration: `20260502120000_add_event_reservations`.
+
+| Method | Path | Auth |
+|--------|------|------|
+| `POST` | `/restaurants/:restaurantId/events/:eventId/reservations` | Bearer + `CUSTOMER` (body: `partySize`, optional `specialRequest`) |
+| `GET` | `/me/event-reservations` | Bearer + `CUSTOMER` — my event reservation list |
+| `PATCH` | `/me/event-reservations/:eventReservationId/cancel` | Bearer + `CUSTOMER` (optional `note`); allowed while PENDING/CONFIRMED and before the event has ended |
+| `GET` | `/restaurants/:restaurantId/event-reservations?eventId=` | Bearer + `RESTAURANT_ADMIN` (assigned) or `PLATFORM_ADMIN` |
+| `PATCH` | `/restaurants/:restaurantId/event-reservations/:eventReservationId/status` | Bearer + same; body: `status` = `CONFIRMED` or `REJECTED`, optional `rejectionReason`, `note` |
+
+**No** payment and **no** event image upload in this step.
+
 ## Local setup
 
 Use **Node.js 22** in this monorepo (root `.nvmrc` and [root README setup](../../README.md#node-22-local). Paths below assume a clone of the repository.)

@@ -267,6 +267,76 @@ export function updateReservationStatus(
   );
 }
 
+export type EventReservationStatus =
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'REJECTED'
+  | 'CANCELLED';
+
+export type AdminEventReservation = {
+  id: string;
+  customerId: string;
+  restaurantId: string;
+  eventId: string;
+  partySize: number;
+  status: EventReservationStatus;
+  specialRequest: string | null;
+  rejectionReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  customer: {
+    id: string;
+    email: string;
+    fullName: string;
+    phone: string | null;
+  };
+  event: {
+    id: string;
+    title: string;
+    startsAt: string;
+    endsAt: string;
+    capacity: number | null;
+  };
+  statusHistory: Array<{
+    id: string;
+    fromStatus: EventReservationStatus | null;
+    toStatus: EventReservationStatus;
+    note: string | null;
+    createdAt: string;
+    changedBy: { id: string; fullName: string; email: string } | null;
+  }>;
+};
+
+export function listRestaurantEventReservations(
+  token: string,
+  restaurantId: string,
+  query: { eventId?: string } = {},
+): Promise<AdminEventReservation[]> {
+  const p = new URLSearchParams();
+  if (query.eventId) p.set('eventId', query.eventId);
+  const qs = p.toString();
+  return apiRequest<AdminEventReservation[]>(
+    `/restaurants/${restaurantId}/event-reservations${qs ? `?${qs}` : ''}`,
+    { method: 'GET', token },
+  );
+}
+
+export function updateEventReservationStatus(
+  token: string,
+  restaurantId: string,
+  eventReservationId: string,
+  input: {
+    status: 'CONFIRMED' | 'REJECTED';
+    rejectionReason?: string;
+    note?: string;
+  },
+): Promise<AdminEventReservation> {
+  return apiRequest<AdminEventReservation>(
+    `/restaurants/${restaurantId}/event-reservations/${eventReservationId}/status`,
+    { method: 'PATCH', token, body: JSON.stringify(input) },
+  );
+}
+
 export type RestaurantAdminAssignment = {
   userId: string;
   restaurantId: string;

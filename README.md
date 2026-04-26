@@ -64,22 +64,21 @@ On every **push** or **pull request** to `main`, [`.github/workflows/ci.yml`](.g
 
 ## Project status
 
-Milestones in place: monorepo foundation; **API** (Nest, health) + **Prisma/PostgreSQL**; **auth** (JWT, register/login) and **RBAC**; **users** (platform management); **restaurants** (CRUD, assignments for restaurant admins); **request-based reservations** (optional table) with **availability** helper; **reservation status history** and lifecycle rules; **event nights (restaurant events)** with **platform approval** (PENDING → APPROVED/REJECTED) and **customer-only visibility** of approved, active, upcoming events; **admin** (Next.js, webpack) and **mobile** (Expo) apps; **My Reservations**; **operating settings**; **customer cancellation** (eligible requests); **restaurant profile** metadata and contacts; **global request validation** (DTO / `ValidationPipe`); documented local workflow; **CI** (see above). **API usage & validation** detail: [apps/api/README.md#request-validation](apps/api/README.md#request-validation).
+Milestones in place: monorepo foundation; **API** (Nest, health) + **Prisma/PostgreSQL**; **auth** (JWT, register/login) and **RBAC**; **users** (platform management); **restaurants** (CRUD, assignments for restaurant admins); **request-based table reservations** (optional table) with **availability** helper; **reservation status history** and lifecycle rules; **event nights (restaurant events)** with **platform approval**; **event reservations** (separate from table flow, **PENDING** until restaurant confirms, **capacity** on confirm); **admin** (Next.js, webpack) and **mobile** (Expo) apps; **My Reservations**; **operating settings**; **customer cancellation** (eligible requests); **restaurant profile** metadata and contacts; **global request validation** (DTO / `ValidationPipe`); documented local workflow; **CI** (see above). **API usage & validation** detail: [apps/api/README.md#request-validation](apps/api/README.md#request-validation).
 
 ## Current MVP capabilities
 
-- **Customer** (mobile): **Home** is **events-first** (approved, active, upcoming **event nights**), then **restaurants**; **event cards** open **Event detail** (event booking is not enabled yet — “coming soon”); **restaurant cards** open **Restaurant detail** for the **normal table reservation request** flow. Booking is separated by context: **EVENT** (`eventId` + `restaurantId`) vs **RESTAURANT** (`restaurantId` only) in the app types.
-- **Customer** can sign in, browse from **Home**, and submit a **table reservation request** (not fixed table selection)
-- **Customer** can see **My Reservations** with **status and history**
+- **Customer** (mobile): **Home** is **events-first** (approved, active, upcoming **event nights**), then **restaurants**; **event cards** open **Event detail** to submit an **event reservation request** (pending until the restaurant approves; date/time from the event); **restaurant cards** open **Restaurant detail** for the **normal table reservation request** flow. The two flows stay separate: **EVENT** uses `eventId` + `restaurantId`; **RESTAURANT** uses `restaurantId` only.
+- **Customer** can sign in, browse from **Home**, and submit a **table reservation request** and/or an **event reservation request**
+- **Customer** can see **My Reservations** with **EVENT** vs **table** sections, **status and history**
 - **Customer** can **cancel** eligible requests (e.g. pending/held/confirmed, before start time) where rules allow
 - **Platform / restaurant admin** can manage **restaurants**, **assign restaurant admins**, and update **reservation status**
 - **Admin** can manage **operating settings** and **restaurant profile** (URLs, descriptions, **contacts**)
-- **Restaurant / platform admins** can create and manage **event nights**; **platform admins** **approve** or **reject** pending events; **customers** only see **approved, active, upcoming** events (admin UI: **Events** under each restaurant)
+- **Restaurant / platform admins** can create and manage **event nights**; **platform admins** **approve** or **reject** pending events; **customers** only see **approved, active, upcoming** events (admin UI: **Events** under each restaurant). **Event reservation requests** are listed separately from table reservations (**Event reservations** in admin); confirming respects **event capacity** when set.
 - **CI** on `main` validates **API, admin, and mobile** (generate, typecheck, build) — [workflow](.github/workflows/ci.yml)
 
 ## Current recommended next work
 
-- **Event reservation / booking** in the mobile app (uses `EVENT` context with `eventId` + `restaurantId`; separate from table requests) — *event detail and types are ready; submission not implemented yet*
 - Offers (later)
 - Discovery / favorites (later)
 - Notifications (later)

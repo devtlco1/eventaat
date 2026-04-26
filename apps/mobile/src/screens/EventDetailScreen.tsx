@@ -6,13 +6,19 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
 import { type EventBookingContext } from '../lib/bookingContext';
-import { fetchRestaurantById, fetchRestaurantEvent } from '../lib/api';
-import type { RestaurantDetail, RestaurantEvent } from '../lib/types';
+import {
+  createEventReservationRequest,
+  fetchOperatingSettings,
+  fetchRestaurantById,
+  fetchRestaurantEvent,
+} from '../lib/api';
+import type { MyEventReservation, RestaurantDetail, RestaurantEvent, RestaurantOperatingSettings } from '../lib/types';
 import { RootStackParamList } from '../navigation/RootNavigator';
 
 type ScreenProps = NativeStackScreenProps<RootStackParamList, 'EventDetail'>;
@@ -46,24 +52,32 @@ export function EventDetailScreen({ route, navigation }: ScreenProps) {
     eventId,
     restaurantId,
   };
-  void _eventBookingContext;
 
   const [event, setEvent] = useState<RestaurantEvent | null>(null);
   const [host, setHost] = useState<RestaurantDetail | null>(null);
+  const [operating, setOperating] = useState<RestaurantOperatingSettings | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadPending, setLoadPending] = useState(true);
+
+  const [partyText, setPartyText] = useState('2');
+  const [note, setNote] = useState('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitBusy, setSubmitBusy] = useState(false);
+  const [submitted, setSubmitted] = useState<MyEventReservation | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
     setLoadError(null);
     setLoadPending(true);
     try {
-      const [ev, rest] = await Promise.all([
+      const [ev, rest, op] = await Promise.all([
         fetchRestaurantEvent(token, restaurantId, eventId),
         fetchRestaurantById(token, restaurantId),
+        fetchOperatingSettings(token, restaurantId).catch(() => null),
       ]);
       setEvent(ev);
       setHost(rest);
+      setOperating(op);
       navigation.setOptions({ title: ev.title });
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to load event';
@@ -180,18 +194,91 @@ export function EventDetailScreen({ route, navigation }: ScreenProps) {
         : null}
 
       <View style={styles.ctaBlock}>
-        <Text style={styles.ctaTitle}>Book this event</Text>
+        <Text style={styles.ctaTitle}>Request a spot (event night)</Text>
         <Text style={styles.ctaBody}>
-          Event reservations are not available in the app yet. A dedicated flow is planned next.
+          Date and time are set by this event. The restaurant must approve your request; you
+          are not confirmed until the status is confirmed.
         </Text>
-        <Pressable
-          style={[styles.primaryBtn, styles.btnDisabled]}
-          disabled
-          accessibilityRole="button"
-          accessibilityState={{ disabled: true }}
-        >
-          <Text style={styles.primaryBtnTextDim}>Event booking (coming soon)</Text>
-        </Pressable>
+        {submitted ? (
+          <>
+            <View style={styles.successBanner}>
+              <Text style={styles.successTitle}>Request sent — pending approval</Text>
+              <Text style={styles.successBody}>
+                Your request for {submitted.partySize}{' '}
+                {submitted.partySize === 1 ? 'guest' : 'guests'} is submitted (status:{' '}
+                {submitted.status}). You will see it under My reservations as an EVENT
+                booking.
+              </Text>
+            </View>
+            <Pressable
+              style={styles.secondaryBtn}
+              onPress={() => navigation.navigate('Reservations')}
+            >
+              <Text style={styles.secondaryBtnText}>View My reservations</Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <Text style={styles.inputLabel}>
+              Party size (guests)
+              {operating
+                ? ` — min ${operating.minPartySize}${
+                    operating.maxPartySize != null
+                      ? `, max ${operating.maxPartySize}`
+                      : ''
+                  }`
+                : null}
+            </Text>
+            <TextInput
+              value={partyText}
+              onChangeText={setPartyText}
+              keyboardType="number-pad"
+              style={styles.textInput}
+              placeholder="e.g. 2"
+            />
+            <Text style={[styles.inputLabel, { marginTop: 12 }]}>Note (optional)</Text>
+            <TextInput
+              value={note}
+              onChangeText={setNote}
+              multiline
+              style={[styles.textInput, styles.textInputMultiline]}
+              placeholder="Diet or accessibility, etc."
+            />
+            {submitError ? <Text style={styles.submitErr}>{submitError}</Text> : null}
+            <Pressable
+              style={[styles.primaryBtn, submitBusy && styles.btnDisabled]}
+              disabled={submitBusy}
+              accessibilityRole="button"
+              onPress={async () => {
+                if (!token) return;
+                setSubmitError(null);
+                const n = parseInt(partyText.replace(/\D/g, ''), 10);
+                if (Number.isNaN(n) || n < 1) {
+                  setSubmitError('Enter a valid party size (at least 1).');
+                  return;
+                }
+                setSubmitBusy(true);
+                try {
+                  const row = await createEventReservationRequest(token, _eventBookingContext.restaurantId, _eventBookingContext.eventId, {
+                    partySize: n,
+                    specialRequest: note.trim() || undefined,
+                  });
+                  setSubmitted(row);
+                } catch (e) {
+                  setSubmitError(e instanceof Error ? e.message : 'Request failed');
+                } finally {
+                  setSubmitBusy(false);
+                }
+              }}
+            >
+              {submitBusy ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.primaryBtnText}>Send request</Text>
+              )}
+            </Pressable>
+          </>
+        )}
       </View>
     </ScrollView>
   );
@@ -246,5 +333,37 @@ const styles = StyleSheet.create({
   },
   btnDisabled: { opacity: 0.5 },
   primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  primaryBtnTextDim: { color: '#e2e8f0', fontSize: 16, fontWeight: '600' },
+  textInput: {
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 16,
+    color: '#0f172a',
+  },
+  textInputMultiline: { minHeight: 80, textAlignVertical: 'top' },
+  inputLabel: { fontSize: 14, fontWeight: '600', color: '#475569', marginTop: 4 },
+  submitErr: { color: '#b91c1c', fontSize: 14, marginTop: 8 },
+  successBanner: {
+    marginTop: 4,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+  },
+  successTitle: { fontSize: 15, fontWeight: '700', color: '#065f46' },
+  successBody: { fontSize: 14, color: '#047857', marginTop: 6, lineHeight: 20 },
+  secondaryBtn: {
+    marginTop: 12,
+    borderRadius: 10,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  secondaryBtnText: { color: '#1e40af', fontSize: 15, fontWeight: '600' },
 });

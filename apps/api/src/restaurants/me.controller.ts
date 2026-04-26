@@ -1,16 +1,40 @@
-import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { SafeUser } from '../users/users.service';
 import { CancelMyReservationDto } from './dto/cancel-my-reservation.dto';
+import { EventReservationService } from './event-reservation.service';
 import { RestaurantsService } from './restaurants.service';
 
 @Controller('me')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class MeController {
-  constructor(private readonly restaurants: RestaurantsService) {}
+  constructor(
+    private readonly restaurants: RestaurantsService,
+    private readonly eventReservations: EventReservationService,
+  ) {}
+
+  @Get('event-reservations')
+  @Roles('CUSTOMER')
+  listMyEventReservations(@CurrentUser() user: SafeUser) {
+    return this.eventReservations.listMyEventReservations(user);
+  }
+
+  @Patch('event-reservations/:eventReservationId/cancel')
+  @Roles('CUSTOMER')
+  cancelMyEventReservation(
+    @Param('eventReservationId', new ParseUUIDPipe()) eventReservationId: string,
+    @Body() dto: CancelMyReservationDto,
+    @CurrentUser() user: SafeUser,
+  ) {
+    return this.eventReservations.cancelMyEventReservation(
+      eventReservationId,
+      user,
+      dto,
+    );
+  }
 
   @Get('reservations')
   @Roles('CUSTOMER')

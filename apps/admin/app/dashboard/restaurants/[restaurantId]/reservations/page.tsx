@@ -158,7 +158,17 @@ export default function RestaurantReservationsPage() {
             {restaurant ? restaurant.name : 'Restaurant reservations'}
           </h1>
           <p className="mt-1 text-sm text-zinc-600">
-            View and manage reservations for this restaurant.
+            View and manage <strong>table</strong> reservation requests for this
+            restaurant. Event nights use a separate list:{' '}
+            {restaurantId ? (
+              <Link
+                href={`/dashboard/restaurants/${restaurantId}/event-reservations`}
+                className="font-medium text-zinc-800 underline decoration-zinc-300 underline-offset-4"
+              >
+                Event reservations
+              </Link>
+            ) : null}
+            .
           </p>
         </div>
         {restaurant ? (
