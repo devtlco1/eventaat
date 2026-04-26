@@ -53,7 +53,7 @@ All paths are relative to the base URL. Unless noted, JSON request bodies follow
 | GET | `/me/reservations` | me | Bearer | CUSTOMER | implemented | List caller’s table reservations (normalized `type: TABLE`, `statusHistory` oldest→newest) |
 | GET | `/me/reservations/:reservationId` | me | Bearer | CUSTOMER | implemented | Single table reservation; 404 if not found / not owner |
 | PATCH | `/me/reservations/:reservationId/cancel` | me | Bearer | CUSTOMER | implemented | Optional body `{ "note"?: string }` |
-| GET | `/me/notifications` | me | Bearer | CUSTOMER, RESTAURANT_ADMIN, PLATFORM_ADMIN | implemented | Query: `unreadOnly?`, `limit?` (1–100); 200: `{ "notifications", "unreadCount" }` (newest first) |
+| GET | `/me/notifications` | me | Bearer | CUSTOMER, RESTAURANT_ADMIN, PLATFORM_ADMIN | implemented | Query: `unreadOnly?`, `limit?` (1–100); 200: `{ "notifications", "unreadCount" }` (newest first; items linkable via `entityType` + id fields) |
 | PATCH | `/me/notifications/read-all` | me | Bearer | same | implemented | Marks all of caller’s as read; 200: `{ "updated": number }` |
 | PATCH | `/me/notifications/:notificationId/read` | me | Bearer | same | implemented | 404 if not the recipient; 200: notification object |
 | POST | `/restaurants` | restaurants (core) | Bearer | PLATFORM_ADMIN | implemented | Create restaurant |

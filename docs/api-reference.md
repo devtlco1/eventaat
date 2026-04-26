@@ -216,6 +216,8 @@ Paths are grouped by concern. **Reservation** routes (below) are **Bearer** + **
 
 `type` is one of: `TABLE_RESERVATION_CONFIRMED`, `TABLE_RESERVATION_REJECTED`, `TABLE_RESERVATION_CANCELLED`, `EVENT_RESERVATION_CONFIRMED`, `EVENT_RESERVATION_REJECTED`, `EVENT_RESERVATION_CANCELLED`. `entityType` is one of: `TABLE_RESERVATION`, `EVENT_RESERVATION`, `RESTAURANT`, `EVENT`.
 
+**Deep linking (clients):** For the reservation-related types above, payloads include `restaurantId`, `reservationId` and/or `eventReservationId`, and `entityId` matching the primary table or event-reservation row. Mobile uses these to open **GET** `/me/reservations/:id` or `/me/event-reservations/:id`. The admin app routes to the per-restaurant list with optional `?reservationId=` or `?eventId=&eventReservationId=` to highlight a row; see product docs (no new HTTP operations).
+
 **When rows are created (no push/email):**
 
 - **Table:** Restaurant/platform moves a request to **CONFIRMED** or **REJECTED** → the **customer** gets one notification. **Customer** cancels a table request (eligible states) → each user assigned to that **restaurant** in `restaurant_admins` gets a notification. Idempotent: duplicate logical sends use a unique `dedupeKey` so retries do not create duplicates.

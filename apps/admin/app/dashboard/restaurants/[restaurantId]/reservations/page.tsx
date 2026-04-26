@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Badge } from '../../../../../components/Badge';
 import { Button } from '../../../../../components/Button';
@@ -45,7 +45,9 @@ function fmt(dt: string): string {
 
 export default function RestaurantReservationsPage() {
   const params = useParams<{ restaurantId: string }>();
+  const sp = useSearchParams();
   const restaurantId = params.restaurantId;
+  const highlightReservationId = sp.get('reservationId')?.trim() || undefined;
 
   const [me, setMe] = useState<MeResponse | null>(null);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
@@ -108,6 +110,15 @@ export default function RestaurantReservationsPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restaurantId]);
+
+  useEffect(() => {
+    if (loading || !highlightReservationId) return;
+    const id = `admin-table-resv-${highlightReservationId}`;
+    const t = setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 150);
+    return () => clearTimeout(t);
+  }, [loading, highlightReservationId, reservations.length]);
 
   async function setStatus(reservationId: string, status: AdminReservationStatus) {
     const token = getToken();
@@ -183,6 +194,18 @@ export default function RestaurantReservationsPage() {
           {error}
         </div>
       ) : null}
+      {highlightReservationId && restaurantId ? (
+        <p className="text-xs text-amber-900/90">
+          Opened from a notification — row{' '}
+          <code className="text-zinc-700">{highlightReservationId}</code> highlighted.{' '}
+          <Link
+            href={`/dashboard/restaurants/${restaurantId}/reservations`}
+            className="font-medium text-amber-950 underline"
+          >
+            Clear
+          </Link>
+        </p>
+      ) : null}
 
       <div className="rounded-xl border border-zinc-200 bg-white shadow-sm">
         <div className="flex items-center justify-between gap-4 border-b border-zinc-200 px-6 py-4">
@@ -245,7 +268,15 @@ export default function RestaurantReservationsPage() {
 
                   return (
                     <Fragment key={r.id}>
-                    <tr className="hover:bg-zinc-50/50">
+                    <tr
+                      id={`admin-table-resv-${r.id}`}
+                      className={
+                        'hover:bg-zinc-50/50 ' +
+                        (highlightReservationId === r.id
+                          ? 'ring-2 ring-amber-400/90 bg-amber-50/60'
+                          : '')
+                      }
+                    >
                       <td className="px-6 py-4 align-top">
                         <span className="text-xs font-semibold text-zinc-800">
                           {typeLabel}

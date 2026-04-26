@@ -1,6 +1,7 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useState } from 'react';
 import {
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -11,6 +12,7 @@ import {
 
 import { useAuth } from '../context/AuthContext';
 import { listMyNotifications, markAllNotificationsRead, markNotificationRead } from '../lib/api';
+import { resolveInAppNotificationDetail } from '../lib/resolveNotificationTarget';
 import type { InAppNotification } from '../lib/types';
 import { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -63,11 +65,12 @@ export function NotificationsScreen({ navigation }: Props) {
           return;
         }
       }
-      if (n.reservationId) {
-        navigation.navigate('ReservationDetail', { kind: 'TABLE', id: n.reservationId });
-      } else if (n.eventReservationId) {
-        navigation.navigate('ReservationDetail', { kind: 'EVENT', id: n.eventReservationId });
+      const target = resolveInAppNotificationDetail(n);
+      if (!target) {
+        Alert.alert('Details unavailable', 'This notification has no linked reservation to open.');
+        return;
       }
+      navigation.navigate('ReservationDetail', { kind: target.kind, id: target.id });
     },
     [token, navigation],
   );

@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '../../../components/Button';
 import {
@@ -11,6 +12,7 @@ import {
   type MeResponse,
 } from '../../../lib/api';
 import { getToken } from '../../../lib/auth';
+import { getNotificationAdminPath } from '../../../lib/notificationLinks';
 
 function fmt(iso: string): string {
   const d = new Date(iso);
@@ -19,11 +21,13 @@ function fmt(iso: string): string {
 }
 
 export default function AdminNotificationsPage() {
+  const router = useRouter();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [rows, setRows] = useState<InAppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [navErr, setNavErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const token = getToken();
@@ -46,17 +50,33 @@ export default function AdminNotificationsPage() {
     void load();
   }, [load]);
 
-  async function onReadOne(n: InAppNotification) {
+  async function markReadIfNeeded(n: InAppNotification) {
     if (n.readAt) return;
     const token = getToken();
     if (!token) return;
+    const updated = await markNotificationRead(token, n.id);
+    setRows((r) => r.map((x) => (x.id === updated.id ? updated : x)));
+    setUnreadCount((c) => Math.max(0, c - 1));
+  }
+
+  async function openNotification(n: InAppNotification) {
+    setErr(null);
+    setNavErr(null);
+    if (!getToken()) return;
     try {
-      const updated = await markNotificationRead(token, n.id);
-      setRows((r) => r.map((x) => (x.id === updated.id ? updated : x)));
-      setUnreadCount((c) => Math.max(0, c - 1));
+      if (!n.readAt) {
+        await markReadIfNeeded(n);
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Failed to mark read');
+      return;
     }
+    const path = getNotificationAdminPath(n);
+    if (!path) {
+      setNavErr('Cannot open: missing restaurant or reservation id on this notification.');
+      return;
+    }
+    router.push(path.path);
   }
 
   async function onReadAll() {
@@ -85,6 +105,11 @@ export default function AdminNotificationsPage() {
           {err}
         </div>
       ) : null}
+      {navErr ? (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          {navErr}
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-zinc-600">
           {unreadCount} unread
@@ -106,22 +131,24 @@ export default function AdminNotificationsPage() {
             <li
               key={n.id}
               className={
-                'rounded-md border p-3 text-sm ' +
+                'cursor-pointer rounded-md border p-3 text-sm ' +
                 (unread ? 'border-sky-200 bg-sky-50' : 'border-zinc-200 bg-white')
               }
+              onClick={() => void openNotification(n)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  void openNotification(n);
+                }
+              }}
+              role="button"
+              tabIndex={0}
             >
               <div className="font-medium text-zinc-900">{n.title}</div>
               <p className="mt-1 text-zinc-700">{n.message}</p>
               <p className="mt-1 text-xs text-zinc-500">
-                {fmt(n.createdAt)} — {n.type}
+                {fmt(n.createdAt)} — {n.type} — click to open
               </p>
-              {unread ? (
-                <div className="mt-2">
-                  <Button variant="secondary" type="button" onClick={() => void onReadOne(n)}>
-                    Mark read
-                  </Button>
-                </div>
-              ) : null}
             </li>
           );
         })}

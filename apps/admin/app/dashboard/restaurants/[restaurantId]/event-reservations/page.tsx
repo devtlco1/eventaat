@@ -2,7 +2,14 @@
 
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
-import { Fragment, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+} from 'react';
 import { Badge } from '../../../../../components/Badge';
 import { Button } from '../../../../../components/Button';
 import { Input } from '../../../../../components/Input';
@@ -37,7 +44,13 @@ export default function RestaurantEventReservationsPage() {
   const params = useParams<{ restaurantId: string }>();
   const sp = useSearchParams();
   const restaurantId = params.restaurantId;
-  const eventFilter = sp.get('eventId')?.trim() || undefined;
+  const eventIdQ = sp.get('eventId')?.trim() || undefined;
+  const highlightEventReservationId = sp.get('eventReservationId')?.trim() || undefined;
+  const listQuery = useMemo((): { eventId?: string } => {
+    if (eventIdQ) return { eventId: eventIdQ };
+    if (highlightEventReservationId) return {};
+    return {};
+  }, [eventIdQ, highlightEventReservationId]);
 
   const [me, setMe] = useState<MeResponse | null>(null);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
@@ -58,12 +71,21 @@ export default function RestaurantEventReservationsPage() {
     const [meRes, restaurantsRes, rows] = await Promise.all([
       getMe(token),
       listRestaurants(token),
-      listRestaurantEventReservations(token, restaurantId, { eventId: eventFilter }),
+      listRestaurantEventReservations(token, restaurantId, listQuery),
     ]);
     setMe(meRes);
     setRestaurant(restaurantsRes.find((r) => r.id === restaurantId) ?? null);
     setList(rows);
-  }, [restaurantId, eventFilter]);
+  }, [restaurantId, listQuery]);
+
+  useEffect(() => {
+    if (loading || !highlightEventReservationId) return;
+    const elId = `admin-event-resv-${highlightEventReservationId}`;
+    const t = setTimeout(() => {
+      document.getElementById(elId)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 150);
+    return () => clearTimeout(t);
+  }, [loading, highlightEventReservationId, list.length]);
 
   useEffect(() => {
     let cancelled = false;
@@ -185,15 +207,24 @@ export default function RestaurantEventReservationsPage() {
             Approve or reject <strong>event</strong> booking requests. These are separate
             from normal table reservations. Capacity is enforced when you confirm.
           </p>
-          {eventFilter ? (
+          {eventIdQ || highlightEventReservationId ? (
             <p className="mt-1 text-xs text-zinc-500">
-              Filtered to event:{' '}
-              <code className="text-zinc-700">{eventFilter}</code>{' '}
+              {eventIdQ ? (
+                <>
+                  Filtered to event: <code className="text-zinc-700">{eventIdQ}</code>
+                </>
+              ) : null}
+              {eventIdQ && highlightEventReservationId ? ' · ' : null}
+              {highlightEventReservationId ? (
+                <>
+                  Row: <code className="text-zinc-700">{highlightEventReservationId}</code>
+                </>
+              ) : null}{' '}
               <Link
                 href={`/dashboard/restaurants/${restaurantId}/event-reservations`}
                 className="text-zinc-800 underline"
               >
-                clear
+                clear filters
               </Link>
             </p>
           ) : null}
@@ -260,7 +291,15 @@ export default function RestaurantEventReservationsPage() {
 
                   return (
                     <Fragment key={row.id}>
-                      <tr className="hover:bg-zinc-50/50">
+                      <tr
+                        id={`admin-event-resv-${row.id}`}
+                        className={
+                          'hover:bg-zinc-50/50 ' +
+                          (highlightEventReservationId === row.id
+                            ? 'ring-2 ring-amber-400/90 bg-amber-50/60'
+                            : '')
+                        }
+                      >
                         <td className="px-6 py-4 align-top text-xs font-semibold text-zinc-800">
                           {typeLabel}
                         </td>
