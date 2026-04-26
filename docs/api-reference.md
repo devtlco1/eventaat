@@ -178,9 +178,52 @@ All routes: **Bearer** + **PLATFORM_ADMIN** only.
 
 ---
 
-## 4. Me (customer session)
+## 4. Me
 
-All routes: **Bearer** + **CUSTOMER** only (via `@Roles`).
+Paths are grouped by concern. **Reservation** routes (below) are **Bearer** + **`CUSTOMER`** only. **In-app notifications** under `/me/notifications` are **Bearer** + **`CUSTOMER`**, **`RESTAURANT_ADMIN`**, or **`PLATFORM_ADMIN`** — each user only sees their own `Notification` rows in the database.
+
+### 4.0 In-app notifications (stored in DB, no push)
+
+| Method | Path | Roles | Notes |
+|--------|------|--------|--------|
+| `GET` | `/me/notifications` | `CUSTOMER`, `RESTAURANT_ADMIN`, `PLATFORM_ADMIN` | Optional query: `unreadOnly` (boolean as string `true`/`false`), `limit` (1–100, default 50) |
+| `PATCH` | `/me/notifications/read-all` | same | Marks all notifications for the caller with `readAt: null` |
+| `PATCH` | `/me/notifications/:notificationId/read` | same | Sets `readAt`; **404** if wrong user |
+
+**200 (GET) example:**
+
+```json
+{
+  "notifications": [
+    {
+      "id": "…",
+      "type": "TABLE_RESERVATION_CONFIRMED",
+      "title": "Table reservation confirmed",
+      "message": "Your reservation at Ristorante has been confirmed.",
+      "entityType": "TABLE_RESERVATION",
+      "entityId": "…",
+      "restaurantId": "…",
+      "eventId": null,
+      "reservationId": "…",
+      "eventReservationId": null,
+      "readAt": null,
+      "createdAt": "2026-01-01T12:00:00.000Z"
+    }
+  ],
+  "unreadCount": 1
+}
+```
+
+`type` is one of: `TABLE_RESERVATION_CONFIRMED`, `TABLE_RESERVATION_REJECTED`, `TABLE_RESERVATION_CANCELLED`, `EVENT_RESERVATION_CONFIRMED`, `EVENT_RESERVATION_REJECTED`, `EVENT_RESERVATION_CANCELLED`. `entityType` is one of: `TABLE_RESERVATION`, `EVENT_RESERVATION`, `RESTAURANT`, `EVENT`.
+
+**When rows are created (no push/email):**
+
+- **Table:** Restaurant/platform moves a request to **CONFIRMED** or **REJECTED** → the **customer** gets one notification. **Customer** cancels a table request (eligible states) → each user assigned to that **restaurant** in `restaurant_admins` gets a notification. Idempotent: duplicate logical sends use a unique `dedupeKey` so retries do not create duplicates.
+- **Event:** Same pattern for event reservation **confirm/reject** (customer) and **customer cancel** (assigned restaurant admins). Event **capacity** rules and transition validation are unchanged; notifications are written only after a successful state change in the same transaction as the update where applicable.
+
+## 4.1 Reservations (customer)
+
+All routes in this section: **Bearer** + **CUSTOMER** only (via `@Roles`).
 
 **Reservation JSON shape (both flows):** responses are **normalized** so UIs can tell **table** vs **event** at a glance:
 

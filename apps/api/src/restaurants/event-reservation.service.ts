@@ -11,6 +11,7 @@ import {
   RestaurantEventStatus,
   Role,
 } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SafeUser } from '../users/users.service';
 import { CreateEventReservationDto } from './dto/create-event-reservation.dto';
@@ -64,7 +65,10 @@ export class EventReservationService {
     EventReservationStatus.CANCELLED,
   ];
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   private isAllowedEventTransition(
     from: EventReservationStatus,
@@ -249,7 +253,10 @@ export class EventReservationService {
     return this.prisma.$transaction(async (tx) => {
       const row = await tx.eventReservation.findFirst({
         where: { id: eventReservationId, customerId: customer.id },
-        include: { event: { select: { endsAt: true } } },
+        include: {
+          event: { select: { endsAt: true, id: true, title: true } },
+          restaurant: { select: { name: true } },
+        },
       });
       if (!row) {
         throw new NotFoundException('Event reservation not found');
@@ -289,6 +296,17 @@ export class EventReservationService {
         where: { id: row.id },
         data: { status: EventReservationStatus.CANCELLED },
       });
+
+      await this.notifications.eventReservationCustomerCancelledNotifyAdminsInTx(
+        tx,
+        {
+          eventReservationId: row.id,
+          restaurantId: row.restaurantId,
+          eventId: row.eventId,
+          restaurantName: row.restaurant.name,
+          eventTitle: row.event.title,
+        },
+      );
 
       return tx.eventReservation.findFirstOrThrow({
         where: { id: row.id },
@@ -367,7 +385,10 @@ export class EventReservationService {
     return this.prisma.$transaction(async (tx) => {
       const row = await tx.eventReservation.findFirst({
         where: { id: eventReservationId, restaurantId },
-        include: { event: { select: { id: true, capacity: true } } },
+        include: {
+          event: { select: { id: true, title: true, capacity: true } },
+          restaurant: { select: { name: true } },
+        },
       });
       if (!row) {
         throw new NotFoundException('Event reservation not found');
@@ -415,7 +436,7 @@ export class EventReservationService {
         },
       });
 
-      return tx.eventReservation.update({
+      const updated = await tx.eventReservation.update({
         where: { id: row.id },
         data: {
           status: dto.status,
@@ -426,6 +447,26 @@ export class EventReservationService {
         },
         include: eventReservationDetailForAdmin,
       } as any);
+
+      if (
+        dto.status === EventReservationStatus.CONFIRMED ||
+        dto.status === EventReservationStatus.REJECTED
+      ) {
+        await this.notifications.eventReservationStatusNotifyCustomerInTx(tx, {
+          customerUserId: row.customerId,
+          eventReservationId: row.id,
+          restaurantId: row.restaurantId,
+          eventId: row.eventId,
+          restaurantName: row.restaurant.name,
+          eventTitle: row.event.title,
+          newStatus:
+            dto.status === EventReservationStatus.CONFIRMED
+              ? 'CONFIRMED'
+              : 'REJECTED',
+        });
+      }
+
+      return updated;
     }).then((r) => toAdminEventReservationView(r as any));
   }
 }

@@ -2,6 +2,8 @@ import type {
   AuthLoginResponse,
   AvailabilityResponse,
   CreateReservationRequestBody,
+  InAppNotification,
+  InAppNotificationListResponse,
   MyEventReservation,
   MyReservation,
   MyTableReservation,
@@ -428,4 +430,70 @@ export async function cancelMyEventReservation(
     throw new Error(message);
   }
   return res.json() as Promise<MyEventReservation>;
+}
+
+export async function listMyNotifications(
+  accessToken: string,
+  opts: { limit?: number; unreadOnly?: boolean } = {},
+): Promise<InAppNotificationListResponse> {
+  const p = new URLSearchParams();
+  if (opts.unreadOnly) p.set('unreadOnly', 'true');
+  if (opts.limit != null) p.set('limit', String(opts.limit));
+  const qs = p.toString();
+  const res = await fetch(`${baseUrl()}/me/notifications${qs ? `?${qs}` : ''}`, {
+    method: 'GET',
+    headers: authHeaders(accessToken),
+  });
+  if (res.status === 401) {
+    throw new Error('Unauthorized (401) — sign in again.');
+  }
+  if (!res.ok) {
+    const message = await readErrorMessage(
+      res,
+      `Could not load notifications (${res.status})`,
+    );
+    throw new Error(message);
+  }
+  return res.json() as Promise<InAppNotificationListResponse>;
+}
+
+export async function markNotificationRead(
+  accessToken: string,
+  notificationId: string,
+): Promise<InAppNotification> {
+  const res = await fetch(
+    `${baseUrl()}/me/notifications/${encodeURIComponent(notificationId)}/read`,
+    { method: 'PATCH', headers: authHeaders(accessToken) },
+  );
+  if (res.status === 401) {
+    throw new Error('Unauthorized (401) — sign in again.');
+  }
+  if (!res.ok) {
+    const message = await readErrorMessage(
+      res,
+      `Could not mark notification (${res.status})`,
+    );
+    throw new Error(message);
+  }
+  return res.json() as Promise<InAppNotification>;
+}
+
+export async function markAllNotificationsRead(
+  accessToken: string,
+): Promise<{ updated: number }> {
+  const res = await fetch(`${baseUrl()}/me/notifications/read-all`, {
+    method: 'PATCH',
+    headers: authHeaders(accessToken),
+  });
+  if (res.status === 401) {
+    throw new Error('Unauthorized (401) — sign in again.');
+  }
+  if (!res.ok) {
+    const message = await readErrorMessage(
+      res,
+      `Could not mark all read (${res.status})`,
+    );
+    throw new Error(message);
+  }
+  return res.json() as Promise<{ updated: number }>;
 }

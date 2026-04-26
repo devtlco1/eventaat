@@ -794,3 +794,62 @@ export function deactivateRestaurantEvent(
   });
 }
 
+export type InAppNotification = {
+  id: string;
+  type:
+    | 'TABLE_RESERVATION_CONFIRMED'
+    | 'TABLE_RESERVATION_REJECTED'
+    | 'TABLE_RESERVATION_CANCELLED'
+    | 'EVENT_RESERVATION_CONFIRMED'
+    | 'EVENT_RESERVATION_REJECTED'
+    | 'EVENT_RESERVATION_CANCELLED';
+  title: string;
+  message: string;
+  entityType: 'TABLE_RESERVATION' | 'EVENT_RESERVATION' | 'RESTAURANT' | 'EVENT';
+  entityId: string;
+  restaurantId: string | null;
+  eventId: string | null;
+  reservationId: string | null;
+  eventReservationId: string | null;
+  readAt: string | null;
+  createdAt: string;
+};
+
+export type InAppNotificationListResponse = {
+  notifications: InAppNotification[];
+  unreadCount: number;
+};
+
+export function listMyNotifications(
+  token: string,
+  q: { limit?: number; unreadOnly?: boolean } = {},
+): Promise<InAppNotificationListResponse> {
+  const p = new URLSearchParams();
+  if (q.unreadOnly) p.set('unreadOnly', 'true');
+  if (q.limit != null) p.set('limit', String(q.limit));
+  const qs = p.toString();
+  return apiRequest<InAppNotificationListResponse>(
+    `/me/notifications${qs ? `?${qs}` : ''}`,
+    { method: 'GET', token },
+  );
+}
+
+export function markNotificationRead(
+  token: string,
+  notificationId: string,
+): Promise<InAppNotification> {
+  return apiRequest<InAppNotification>(
+    `/me/notifications/${encodeURIComponent(notificationId)}/read`,
+    { method: 'PATCH', token },
+  );
+}
+
+export function markAllNotificationsRead(
+  token: string,
+): Promise<{ updated: number }> {
+  return apiRequest<{ updated: number }>('/me/notifications/read-all', {
+    method: 'PATCH',
+    token,
+  });
+}
+

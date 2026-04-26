@@ -1,5 +1,5 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useLayoutEffect, useState } from 'react';
 import {
   Pressable,
   RefreshControl,
@@ -12,7 +12,7 @@ import {
 import { EventCard } from '../components/EventCard';
 import { RestaurantCard } from '../components/RestaurantCard';
 import { useAuth } from '../context/AuthContext';
-import { type EventFeedItem, fetchHomeData } from '../lib/api';
+import { type EventFeedItem, fetchHomeData, listMyNotifications } from '../lib/api';
 import type { Restaurant } from '../lib/types';
 import { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -24,6 +24,7 @@ export function HomeScreen({ navigation }: Props) {
   const [restaurants, setRestaurants] = useState<Restaurant[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [unreadNotif, setUnreadNotif] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -48,12 +49,56 @@ export function HomeScreen({ navigation }: Props) {
     }
   }, [load]);
 
+  const refreshUnread = useCallback(async () => {
+    if (!token) {
+      setUnreadNotif(0);
+      return;
+    }
+    try {
+      const { unreadCount } = await listMyNotifications(token, { limit: 1 });
+      setUnreadNotif(unreadCount);
+    } catch {
+      setUnreadNotif(null);
+    }
+  }, [token]);
+
   React.useEffect(() => {
     const unsub = navigation.addListener('focus', () => {
       void load();
+      void refreshUnread();
     });
     return unsub;
-  }, [navigation, load]);
+  }, [navigation, load, refreshUnread]);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={homeHeaderStyles.row}>
+          <Pressable
+            onPress={() => navigation.navigate('Reservations')}
+            hitSlop={8}
+            style={homeHeaderStyles.btn}
+          >
+            <Text style={homeHeaderStyles.link}>Reservations</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => navigation.navigate('Notifications')}
+            hitSlop={8}
+            style={homeHeaderStyles.btn}
+          >
+            <Text style={homeHeaderStyles.link}>
+              {unreadNotif != null && unreadNotif > 0
+                ? `Notif (${unreadNotif})`
+                : 'Notif'}
+            </Text>
+          </Pressable>
+          <Pressable onPress={() => void signOut()} hitSlop={8} style={homeHeaderStyles.btn}>
+            <Text style={homeHeaderStyles.muted}>Log out</Text>
+          </Pressable>
+        </View>
+      ),
+    });
+  }, [navigation, signOut, unreadNotif]);
 
   const isUnauthorized = error?.includes('401') || error?.toLowerCase().includes('unauthor');
 
@@ -151,4 +196,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   retryText: { color: '#fff', fontWeight: '600' },
+});
+
+const homeHeaderStyles = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center' },
+  btn: { marginLeft: 6 },
+  link: { color: '#2563eb', fontSize: 15, fontWeight: '500' },
+  muted: { color: '#64748b', fontSize: 15, fontWeight: '500' },
 });

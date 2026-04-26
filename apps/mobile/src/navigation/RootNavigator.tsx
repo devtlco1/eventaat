@@ -1,6 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
 import { EventDetailScreen } from '../screens/EventDetailScreen';
@@ -9,6 +9,7 @@ import { LoginScreen } from '../screens/LoginScreen';
 import { ReservationDetailScreen } from '../screens/ReservationDetailScreen';
 import { ReservationsScreen } from '../screens/ReservationsScreen';
 import { RestaurantDetailScreen } from '../screens/RestaurantDetailScreen';
+import { NotificationsScreen } from '../screens/NotificationsScreen';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -20,12 +21,14 @@ export type RootStackParamList = {
   Reservations: undefined;
   /** Customer-only; TABLE vs EVENT must match the reservation. */
   ReservationDetail: { kind: 'TABLE' | 'EVENT'; id: string };
+  /** In-app notifications (database-backed, not push). */
+  Notifications: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export function RootNavigator() {
-  const { token, isReady, signOut } = useAuth();
+  const { token, isReady } = useAuth();
 
   if (!isReady) {
     return (
@@ -54,23 +57,7 @@ export function RootNavigator() {
           <Stack.Screen
             name="Home"
             component={HomeScreen}
-            options={({ navigation }) => ({
-              title: 'Home',
-              headerRight: () => (
-                <View style={styles.headerRow}>
-                  <Pressable
-                    onPress={() => navigation.navigate('Reservations')}
-                    hitSlop={8}
-                    style={styles.headerPress}
-                  >
-                    <Text style={styles.headerLink}>Reservations</Text>
-                  </Pressable>
-                  <Pressable onPress={() => signOut()} hitSlop={8} style={styles.headerPress}>
-                    <Text style={styles.headerMuted}>Log out</Text>
-                  </Pressable>
-                </View>
-              ),
-            })}
+            options={{ title: 'Home' }}
           />
           <Stack.Screen
             name="EventDetail"
@@ -94,6 +81,11 @@ export function RootNavigator() {
             component={ReservationDetailScreen}
             options={{ title: 'Reservation' }}
           />
+          <Stack.Screen
+            name="Notifications"
+            component={NotificationsScreen}
+            options={{ title: 'Notifications' }}
+          />
         </>
       )}
     </Stack.Navigator>
@@ -107,8 +99,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#f8fafc',
   },
-  headerRow: { flexDirection: 'row', alignItems: 'center' },
-  headerPress: { marginLeft: 8 },
-  headerLink: { color: '#2563eb', fontSize: 16, fontWeight: '500' },
-  headerMuted: { color: '#64748b', fontSize: 16, fontWeight: '500' },
 });

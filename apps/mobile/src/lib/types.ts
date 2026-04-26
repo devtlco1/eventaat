@@ -247,3 +247,37 @@ export type MyEventReservation = {
   };
   statusHistory: EventStatusHistoryItem[];
 };
+
+export type InAppNotificationType =
+  | 'TABLE_RESERVATION_CONFIRMED'
+  | 'TABLE_RESERVATION_REJECTED'
+  | 'TABLE_RESERVATION_CANCELLED'
+  | 'EVENT_RESERVATION_CONFIRMED'
+  | 'EVENT_RESERVATION_REJECTED'
+  | 'EVENT_RESERVATION_CANCELLED';
+
+export type InAppNotificationEntityType =
+  | 'TABLE_RESERVATION'
+  | 'EVENT_RESERVATION'
+  | 'RESTAURANT'
+  | 'EVENT';
+
+export type InAppNotification = {
+  id: string;
+  type: InAppNotificationType;
+  title: string;
+  message: string;
+  entityType: InAppNotificationEntityType;
+  entityId: string;
+  restaurantId: string | null;
+  eventId: string | null;
+  reservationId: string | null;
+  eventReservationId: string | null;
+  readAt: string | null;
+  createdAt: string;
+};
+
+export type InAppNotificationListResponse = {
+  notifications: InAppNotification[];
+  unreadCount: number;
+};

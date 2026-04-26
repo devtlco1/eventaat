@@ -19,6 +19,7 @@ import {
   RestaurantOperatingSettings,
   RestaurantOpeningHour,
 } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SafeUser } from '../users/users.service';
 import { AvailabilityQueryDto } from './dto/availability-query.dto';
@@ -117,7 +118,10 @@ export class RestaurantsService {
     return next.includes(to);
   }
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   // ─── Core CRUD ────────────────────────────────────────────────────────────
 
@@ -1116,7 +1120,14 @@ export class RestaurantsService {
     return this.prisma.$transaction(async (tx) => {
       const row = await tx.reservation.findFirst({
         where: { id: reservationId, customerId: customer.id },
-        select: { id: true, status: true, startAt: true },
+        select: {
+          id: true,
+          status: true,
+          startAt: true,
+          customerId: true,
+          restaurantId: true,
+          restaurant: { select: { name: true } },
+        },
       });
       if (!row) {
         throw new NotFoundException('Reservation not found');
@@ -1165,6 +1176,15 @@ export class RestaurantsService {
         where: { id: row.id },
         data: { status: ReservationStatus.CANCELLED },
       });
+
+      await this.notifications.tableReservationCustomerCancelledNotifyAdminsInTx(
+        tx,
+        {
+          reservationId: row.id,
+          restaurantId: row.restaurantId,
+          restaurantName: row.restaurant.name,
+        },
+      );
 
       return tx.reservation.findFirstOrThrow({
         where: { id: row.id },
@@ -1226,7 +1246,9 @@ export class RestaurantsService {
     return this.prisma.$transaction(async (tx) => {
       const row = await tx.reservation.findFirst({
         where: { id: reservationId, restaurantId },
-        select: { id: true, status: true },
+        include: {
+          restaurant: { select: { name: true } },
+        },
       });
       if (!row) {
         throw new NotFoundException('Reservation not found');
@@ -1258,11 +1280,29 @@ export class RestaurantsService {
         },
       });
 
-      return tx.reservation.update({
+      const updated = await tx.reservation.update({
         where: { id: reservationId },
         data: { status: dto.status },
         include: tableReservationDetailForAdmin,
       } as any);
+
+      if (
+        dto.status === ReservationStatus.CONFIRMED ||
+        dto.status === ReservationStatus.REJECTED
+      ) {
+        await this.notifications.tableReservationStatusNotifyCustomerInTx(tx, {
+          customerUserId: row.customerId,
+          reservationId: row.id,
+          restaurantId,
+          restaurantName: row.restaurant.name,
+          newStatus:
+            dto.status === ReservationStatus.CONFIRMED
+              ? 'CONFIRMED'
+              : 'REJECTED',
+        });
+      }
+
+      return updated;
     }).then((r) => toAdminTableReservationView(r as any));
   }
 

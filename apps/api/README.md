@@ -28,7 +28,7 @@ curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:4000/auth/login 
 
 ## Endpoints (legacy snapshot — use docs instead)
 
-> **Source of truth:** the complete route list, roles, and tables are in **[`docs/api-reference.md`](../../docs/api-reference.md)** and **[`docs/api-inventory.md`](../../docs/api-inventory.md)**. The app exposes **~51** HTTP operations across health, auth, users, me, and restaurants (including table and event flows, **detail GETs** under `me/…` and `restaurants/…/reservations` and `…/event-reservations`).
+> **Source of truth:** the complete route list, roles, and tables are in **[`docs/api-reference.md`](../../docs/api-reference.md)** and **[`docs/api-inventory.md`](../../docs/api-inventory.md)**. The app exposes **~54** HTTP operations across health, auth, users, me, and restaurants (including table and event flows, in-app **notifications** under `me/notifications`, and **detail GETs** under `me/…` reservations and `restaurants/…/reservations` / `…/event-reservations`).
 
 The sections below (event nights, event reservations) retain useful curl context; they do not list every table-reservation or profile route. Prefer the `docs/api-*.md` files when wiring clients.
 
