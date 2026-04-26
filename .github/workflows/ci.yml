@@ -1,0 +1,45 @@
+# Continuous integration: typecheck and build the API, admin, and mobile packages.
+# No database, migrations, or running servers — Prisma `generate` only needs the schema.
+name: eventaat CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      CI: 'true'
+      NODE_ENV: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prisma generate (API)
+        run: npm run api:generate
+
+      - name: Typecheck API
+        run: npm run check:api
+
+      - name: Build API
+        run: npm run api:build
+
+      - name: Typecheck admin
+        run: npm run check:admin
+
+      - name: Build admin (webpack)
+        run: npm run admin:build
+
+      - name: Typecheck mobile
+        run: npm run check:mobile

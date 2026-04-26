@@ -173,6 +173,8 @@ npm run check:admin
 npm run check:mobile
 ```
 
+The same **generate + typecheck + API build + admin typecheck + admin build + mobile typecheck** flow runs in **GitHub Actions** on pushes and PRs to `main` (see [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)). Use the commands above to fix failures locally before they hit CI.
+
 ---
 
 ## Quick reference (root scripts)

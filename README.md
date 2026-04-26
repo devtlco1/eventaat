@@ -58,6 +58,10 @@ curl http://localhost:4000/health
 
 API details, curl examples, and **request validation** (global DTO `ValidationPipe`): [`apps/api/README.md`](apps/api/README.md#request-validation).
 
+## CI (GitHub Actions)
+
+On every **push** or **pull request** to `main`, [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on Node **22** with `npm ci`, then: `api:generate`, `check:api`, `api:build`, `check:admin`, `admin:build`, and `check:mobile`. No database or migrations — only compile-time checks. The **Quality checks** block in [docs/local-development.md](docs/local-development.md) lists the same commands to run locally.
+
 ## Status
 
 - Step 1 — monorepo skeleton
