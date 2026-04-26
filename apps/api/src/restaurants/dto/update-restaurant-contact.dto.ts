@@ -5,12 +5,14 @@ import {
   IsOptional,
   IsString,
   MaxLength,
+  MinLength,
 } from 'class-validator';
 import { RestaurantContactType } from '@prisma/client';
 
 export class UpdateRestaurantContactDto {
   @IsOptional()
   @IsString()
+  @MinLength(1)
   @MaxLength(200)
   label?: string;
 
@@ -20,6 +22,7 @@ export class UpdateRestaurantContactDto {
 
   @IsOptional()
   @IsString()
+  @MinLength(1)
   @MaxLength(4000)
   value?: string;
 

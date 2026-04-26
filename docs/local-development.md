@@ -106,6 +106,8 @@ npm run api:dev
 
 If the dev process is slow or noisy, prefer **`api:build` + `api:start`**.
 
+**Validation:** the API uses a global `ValidationPipe` (whitelist + reject unknown body fields, class-transformer for DTOs). If the admin or mobile app sends a **400** on a route that used to work, check for typos, extra properties in JSON bodies, and query string types (e.g. `partySize` must be numeric for availability). See [`apps/api/README.md`](../apps/api/README.md#request-validation).
+
 ---
 
 ## E. Start the admin dashboard (Next.js, **webpack**)

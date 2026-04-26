@@ -6,10 +6,14 @@ import {
   IsBoolean,
   IsInt,
   IsString,
+  Matches,
   Max,
   Min,
   ValidateNested,
 } from 'class-validator';
+
+/** 24h wall time (same rule as `operating-time.util` / HH:mm). */
+const HH_MM = /^([01]?\d|2[0-3]):[0-5]\d$/;
 
 export class OpeningHourDayDto {
   @Type(() => Number)
@@ -19,9 +23,11 @@ export class OpeningHourDayDto {
   dayOfWeek!: number;
 
   @IsString()
+  @Matches(HH_MM, { message: 'opensAt must be HH:mm' })
   opensAt!: string;
 
   @IsString()
+  @Matches(HH_MM, { message: 'closesAt must be HH:mm' })
   closesAt!: string;
 
   @Type(() => Boolean)

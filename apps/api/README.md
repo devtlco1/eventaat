@@ -2,6 +2,23 @@
 
 NestJS + Prisma backend for eventaat. PostgreSQL is the database.
 
+## Request validation
+
+All DTO-typed request bodies and query objects are validated by a global `ValidationPipe` in `src/main.ts`: **`whitelist: true`**, **`forbidNonWhitelisted: true`**, **`transform: true`**, and **`transformOptions: { enableImplicitConversion: true }`**. Client mistakes typically return **400** with a `message` array (Nest’s default), before controllers run. Do not rely on unknown JSON fields being ignored—they are **rejected** for routes that use a DTO.
+
+**Quick 400 examples**
+
+```bash
+# login: not an email
+curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:4000/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"nope","password":"x"}'
+# → 400
+
+# reservation: unknown property (if you pass a DTO and a field not on CreateReservationDto)
+# → 400 with forbidNonWhitelisted
+```
+
 **Step 6 deliverable:** restaurants foundation.
 - New `Restaurant` model + migration `20260425120000_add_restaurant`.
 - `RestaurantsModule` with CRUD-ish endpoints (no DELETE in MVP — use `isActive=false`).

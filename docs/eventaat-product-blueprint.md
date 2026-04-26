@@ -7,6 +7,8 @@ This document describes the product vision, principles, and roadmap for **eventa
 
 **Local development setup (tooling, ports, Docker):** see [local-development.md](local-development.md).
 
+The HTTP API enforces request validation globally (class-validator on DTOs): invalid payloads, unknown body properties on typed routes, and malformed query values should fail with **400** before business logic runs. Details: [`apps/api/README.md`](../apps/api/README.md#request-validation).
+
 ---
 
 ## 1. Product Vision

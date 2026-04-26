@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
   IsInt,
   IsOptional,
@@ -43,11 +44,13 @@ export class AvailabilityQueryDto {
   @Validate(IsValidYyyyMmDd)
   date!: string;
 
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   partySize!: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(30)
   @Max(240)

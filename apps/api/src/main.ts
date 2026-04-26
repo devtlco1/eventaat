@@ -23,9 +23,9 @@ async function bootstrap(): Promise<void> {
     origin: ['http://localhost:3000'],
   });
 
-  // Global request validation. `whitelist` strips unknown fields,
-  // `forbidNonWhitelisted` rejects them with 400, and `transform` turns
-  // plain JSON into class instances so DTO defaults / typing work.
+  // Global validation (class-validator + class-transformer). All JSON bodies
+  // and DTO-typed query objects are checked before route handlers. Unknown
+  // properties in bodies are rejected (400) when a DTO is used.
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

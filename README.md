@@ -56,7 +56,7 @@ Minimal API smoke test after following that doc:
 curl http://localhost:4000/health
 ```
 
-API details and walkthroughs: [`apps/api/README.md`](apps/api/README.md).
+API details, curl examples, and **request validation** (global DTO `ValidationPipe`): [`apps/api/README.md`](apps/api/README.md#request-validation).
 
 ## Status
 

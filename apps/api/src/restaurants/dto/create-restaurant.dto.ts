@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
   IsBoolean,
   IsNumber,
@@ -41,18 +42,21 @@ export class CreateRestaurantDto {
   area?: string;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 7 })
   @Min(-90)
   @Max(90)
   latitude?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 7 })
   @Min(-180)
   @Max(180)
   longitude?: number;
 
   @IsOptional()
+  @Type(() => Boolean)
   @IsBoolean()
   isActive?: boolean;
 }
