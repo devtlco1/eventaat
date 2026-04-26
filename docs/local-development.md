@@ -155,6 +155,8 @@ The post-login layout uses a **left sidebar** on `md+` and **Menu** on small scr
 | **Admin “hangs” on start or build** | Ensure scripts use **`--webpack`**, not default Turbopack. Do not run `next dev` without `next dev -p 3000 --webpack`. |
 | **Duplicate React / invalid hook call** | Single React 19.1.0 for admin via root `overrides`; from repo root run `npm install`; avoid a second `react` copy under `apps/admin` only. |
 | **Corrupt `node_modules` or odd errors** | Remove `node_modules` and lock if needed, then `npm install` from **repo root**. |
+| **`api:start` fails: `Cannot find module '.../parsePhoneNumberWithError_.js'`** (from `class-validator` / `libphonenumber-js`) | A broken install can omit files (duplicate filenames with extra spaces in `node_modules` also suggest this). From **repo root**: `npm ci`, or reinstall the `libphonenumber-js` package, then `npm run api:build` and `npm run api:start` again. |
+| **`EADDRINUSE` on port 3000** (admin `npm run admin:dev`) | Another app is using the port. Stop the other process or run admin on a different port only if you know how to set `PORT` for Next. |
 | **Wrong working directory** | Monorepo commands must be run from **`eventaat/`** root, or with explicit `-w @eventaat/...` as in this doc. |
 
 ---
@@ -178,6 +180,10 @@ npm run check:mobile
 ```
 
 The same **generate + typecheck + API build + admin typecheck + admin build + mobile typecheck** flow runs in **GitHub Actions** on pushes and PRs to `main` (see [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)). Use the commands above to fix failures locally before they hit CI.
+
+### Admin dashboard browser QA (Step 40E)
+
+After **API** (4000) and **admin** (3000) are up, do a **manual** pass: **`/login`** (valid `PLATFORM_ADMIN` and `RESTAURANT_ADMIN` if you have test accounts, bad password → error, `CUSTOMER` or no token must not see **`/dashboard`** as an authenticated app). Open each **sidebar** route, **`/dashboard/account`**, theme toggle, **logout**; on **bookings** pages, try **filters**, **open from notifications** (query `reservationId` / `eventReservationId`), and **mark read / mark all** on **Notifications**. CI and typecheck do **not** replace this. **No AppIcons** changes; **no new** API for this step unless a bug must be fixed.
 
 ---
 
