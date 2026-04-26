@@ -310,8 +310,11 @@ export default function RestaurantReservationsPage() {
                           Submitted: {r.requestedAt ? fmt(r.requestedAt) : '—'}
                         </div>
                         {r.restaurant ? (
-                          <div className="mt-0.5 text-zinc-600" title={r.restaurant.name}>
-                            {r.restaurant.name}
+                          <div
+                            className="mt-0.5 text-zinc-600"
+                            title={r.restaurant?.name ?? ''}
+                          >
+                            {r.restaurant?.name ?? '—'}
                           </div>
                         ) : null}
                         {r.customerPhone ? (

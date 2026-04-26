@@ -70,10 +70,12 @@ function fmt(dt: string) {
 function includesCustomer(r: RestaurantReservation, q: string) {
   const t = q.trim().toLowerCase();
   if (!t) return true;
+  const c = r.customer;
+  if (!c) return false;
   return (
-    r.customer.fullName.toLowerCase().includes(t) ||
-    r.customer.email.toLowerCase().includes(t) ||
-    (r.customer.phone && r.customer.phone.toLowerCase().includes(t))
+    (c.fullName?.toLowerCase() ?? '').includes(t) ||
+    (c.email?.toLowerCase() ?? '').includes(t) ||
+    (c.phone && c.phone.toLowerCase().includes(t))
   );
 }
 
@@ -149,7 +151,7 @@ export default function GlobalTableReservationsPage() {
     const toT = dateTo ? new Date(`${dateTo}T23:59:59.999`) : null;
     return reservations.filter((r) => {
       if (statusFilter !== 'ALL' && r.status !== statusFilter) return false;
-      if (restFilter !== 'ALL' && r.restaurant.id !== restFilter) return false;
+      if (restFilter !== 'ALL' && r.restaurant?.id !== restFilter) return false;
       if (!includesCustomer(r, customerQ)) return false;
       const st = new Date(r.startAt);
       if (fromT && !isNaN(fromT.getTime()) && st < fromT) return false;
@@ -480,7 +482,7 @@ export default function GlobalTableReservationsPage() {
                           </div>
                         </td>
                         <td className="px-3 py-2 align-top text-zinc-800">
-                          {r.restaurant.name}
+                          {r.restaurant?.name ?? '—'}
                           <div>
                             <Link
                               className="text-xs text-zinc-600 underline"
@@ -502,9 +504,11 @@ export default function GlobalTableReservationsPage() {
                           </div>
                         </td>
                         <td className="px-3 py-2 align-top">
-                          <div className="text-zinc-900">{r.customer.fullName}</div>
+                          <div className="text-zinc-900">
+                            {r.customer?.fullName ?? '—'}
+                          </div>
                           <div className="text-xs text-zinc-500">
-                            {r.customer.email}
+                            {r.customer?.email ?? '—'}
                           </div>
                         </td>
                         <td className="px-3 py-2">{r.partySize}</td>

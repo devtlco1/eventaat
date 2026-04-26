@@ -73,7 +73,10 @@ export default function GlobalEventReservationsPage() {
   const eventOptions = useMemo(() => {
     const m = new Map<string, string>();
     for (const r of rows) {
-      m.set(r.eventId, r.event.title);
+      m.set(
+        r.eventId,
+        r.event?.title ?? `Event ${r.eventId.slice(0, 8)}…`,
+      );
     }
     return Array.from(m.entries()).sort((a, b) => a[1].localeCompare(b[1]));
   }, [rows]);
@@ -357,7 +360,7 @@ export default function GlobalEventReservationsPage() {
                       </div>
                     </td>
                     <td className="px-3 py-2 align-top text-zinc-800 dark:text-zinc-200">
-                      {r.restaurant.name}
+                      {r.restaurant?.name ?? '—'}
                       <div>
                         <Link
                           className="text-xs text-zinc-600 underline dark:text-amber-200/80"
@@ -382,15 +385,17 @@ export default function GlobalEventReservationsPage() {
                       </div>
                     </td>
                     <td className="px-3 py-2 text-zinc-800 dark:text-zinc-200 max-w-[10rem]">
-                      {r.event.title}
+                      {r.event?.title ?? '—'}
                     </td>
                     <td className="px-3 py-2 text-xs text-zinc-600 dark:text-zinc-400">
-                      {fmt(r.event.startsAt)} — {fmt(r.event.endsAt)}
+                      {r.event
+                        ? `${fmt(r.event.startsAt)} — ${fmt(r.event.endsAt)}`
+                        : '—'}
                     </td>
                     <td className="px-3 py-2">
-                      <div>{r.customer.fullName}</div>
+                      <div>{r.customer?.fullName ?? '—'}</div>
                       <div className="text-xs text-zinc-500">
-                        {r.customer.email}
+                        {r.customer?.email ?? '—'}
                       </div>
                     </td>
                     <td className="px-3 py-2">{r.partySize}</td>

@@ -285,9 +285,9 @@ export default function RestaurantEventReservationsPage() {
                   const isRejecting = rejectingId === row.id;
                   const typeLabel = row.type ?? 'EVENT';
                   const priceLine =
-                    row.event.isFree || row.event.price == null
+                    !row.event || row.event.isFree || row.event.price == null
                       ? 'Free'
-                      : `${row.event.price} ${row.event.currency}`.trim();
+                      : `${row.event?.price ?? ''} ${row.event?.currency ?? ''}`.trim();
 
                   return (
                     <Fragment key={row.id}>
@@ -304,22 +304,30 @@ export default function RestaurantEventReservationsPage() {
                           {typeLabel}
                         </td>
                         <td className="px-6 py-4">
-                          <div className="font-medium text-zinc-900">{row.customer.email}</div>
-                          {row.customer.fullName ? (
-                            <div className="text-xs text-zinc-500">{row.customer.fullName}</div>
+                          <div className="font-medium text-zinc-900">
+                            {row.customer?.email ?? '—'}
+                          </div>
+                          {row.customer?.fullName ? (
+                            <div className="text-xs text-zinc-500">{row.customer?.fullName}</div>
                           ) : null}
-                          {row.customer.phone ? (
-                            <div className="text-xs text-zinc-500">{row.customer.phone}</div>
+                          {row.customer?.phone ? (
+                            <div className="text-xs text-zinc-500">{row.customer?.phone}</div>
                           ) : null}
                         </td>
                         <td className="max-w-[12rem] px-6 py-4 text-zinc-800">
-                          <div className="font-medium">{row.event.title}</div>
+                          <div className="font-medium">{row.event?.title ?? '—'}</div>
                           <div className="text-xs text-zinc-500">{priceLine}</div>
                         </td>
                         <td className="px-6 py-4 text-zinc-700">
-                          <div className="whitespace-nowrap">{fmt(row.event.startsAt)}</div>
+                          <div className="whitespace-nowrap">
+                            {row.event?.startsAt
+                              ? fmt(row.event.startsAt)
+                              : '—'}
+                          </div>
                           {row.restaurant ? (
-                            <div className="text-xs text-zinc-500">{row.restaurant.name}</div>
+                            <div className="text-xs text-zinc-500">
+                              {row.restaurant?.name ?? '—'}
+                            </div>
                           ) : null}
                         </td>
                         <td className="px-6 py-4 text-zinc-700">{row.partySize}</td>
