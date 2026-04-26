@@ -162,6 +162,34 @@ export async function createReservationRequest(
   return res.json() as Promise<ReservationRecord>;
 }
 
+export type CancelMyReservationBody = { note?: string };
+
+export async function cancelMyReservation(
+  accessToken: string,
+  reservationId: string,
+  body: CancelMyReservationBody = {},
+): Promise<MyReservation> {
+  const res = await fetch(
+    `${baseUrl()}/me/reservations/${encodeURIComponent(reservationId)}/cancel`,
+    {
+      method: 'PATCH',
+      headers: { ...authHeaders(accessToken), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ note: body.note }),
+    },
+  );
+  if (res.status === 401) {
+    throw new Error('Unauthorized (401) — sign in again.');
+  }
+  if (!res.ok) {
+    const message = await readErrorMessage(
+      res,
+      `Could not cancel reservation (${res.status})`,
+    );
+    throw new Error(message);
+  }
+  return res.json() as Promise<MyReservation>;
+}
+
 export async function fetchMyReservations(
   accessToken: string,
 ): Promise<MyReservation[]> {

@@ -2,6 +2,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   ListRenderItem,
   Pressable,
@@ -12,7 +13,7 @@ import {
 } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
-import { fetchMyReservations } from '../lib/api';
+import { cancelMyReservation, fetchMyReservations } from '../lib/api';
 import type { BookingType, GuestType, MyReservation, ReservationStatus, SeatingPreference } from '../lib/types';
 import { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -51,6 +52,12 @@ const BOOK_LABEL: Record<BookingType, string> = {
   OCCASION: 'Occasion',
   OTHER: 'Other',
 };
+
+const STATUS_CUSTOMER_MAY_CANCEL: ReadonlySet<ReservationStatus> = new Set([
+  'PENDING',
+  'HELD',
+  'CONFIRMED',
+]);
 
 function formatHistoryWhen(iso: string): string {
   try {
@@ -93,6 +100,7 @@ export function ReservationsScreen(_props: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   const load = useCallback(
     async (isRefresh: boolean) => {
@@ -133,7 +141,31 @@ export function ReservationsScreen(_props: Props) {
     void load(true);
   }, [load]);
 
-  const renderItem: ListRenderItem<MyReservation> = useCallback(({ item: r }) => {
+  const requestCancel = useCallback(
+    async (r: MyReservation) => {
+      if (!token) return;
+      setCancellingId(r.id);
+      try {
+        await cancelMyReservation(token, r.id, {});
+        const list = await fetchMyReservations(token);
+        setReservations(list);
+        Alert.alert('Cancelled', 'Your reservation was cancelled.');
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Could not cancel';
+        if (msg.includes('401')) {
+          await signOut();
+          return;
+        }
+        Alert.alert('Error', msg);
+      } finally {
+        setCancellingId(null);
+      }
+    },
+    [token, signOut],
+  );
+
+  const renderItem: ListRenderItem<MyReservation> = useCallback(
+    ({ item: r }) => {
     const st = r.status;
     const badge = STATUS_BADGE[st] ?? {
       bg: '#f4f4f5',
@@ -142,6 +174,11 @@ export function ReservationsScreen(_props: Props) {
     };
     const name = r.restaurant.name;
     const loc = placeSubtitle(r);
+    const startMs = new Date(r.startAt).getTime();
+    const beforeStart = startMs > Date.now();
+    const mayCancel = STATUS_CUSTOMER_MAY_CANCEL.has(st) && beforeStart;
+    const busyThis = cancellingId === r.id;
+    const cancelInFlight = cancellingId != null;
     return (
       <View style={styles.card} accessibilityLabel={`Reservation ${badge.display}`}>
         <View style={styles.cardHeader}>
@@ -188,9 +225,37 @@ export function ReservationsScreen(_props: Props) {
             })}
           </View>
         ) : null}
+        {mayCancel ? (
+          <Pressable
+            style={[styles.cancelBtn, cancelInFlight && styles.btnDisabled]}
+            onPress={() => {
+              if (cancelInFlight) return;
+              Alert.alert('Cancel this reservation?', undefined, [
+                { text: 'Keep', style: 'cancel' },
+                {
+                  text: 'Cancel reservation',
+                  style: 'destructive',
+                  onPress: () => {
+                    void requestCancel(r);
+                  },
+                },
+              ]);
+            }}
+            disabled={cancelInFlight}
+            accessibilityLabel="Cancel reservation"
+          >
+            {busyThis ? (
+              <ActivityIndicator size="small" color="#b91c1c" />
+            ) : (
+              <Text style={styles.cancelBtnText}>Cancel</Text>
+            )}
+          </Pressable>
+        ) : null}
       </View>
     );
-  }, []);
+  },
+    [cancellingId, requestCancel],
+  );
 
   if (loading && !refreshing) {
     return (
@@ -318,4 +383,15 @@ const styles = StyleSheet.create({
   note: { marginTop: 4, fontSize: 15, color: '#334155', lineHeight: 22 },
   badge: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, alignSelf: 'flex-start' },
   badgeText: { fontSize: 12, fontWeight: '800' },
+  cancelBtn: {
+    marginTop: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    backgroundColor: '#fef2f2',
+  },
+  cancelBtnText: { color: '#b91c1c', fontSize: 15, fontWeight: '600' },
+  btnDisabled: { opacity: 0.5 },
 });

@@ -28,6 +28,7 @@ import { UpdateReservationStatusDto } from './dto/update-reservation-status.dto'
 import { UpdateRestaurantTableDto } from './dto/update-restaurant-table.dto';
 import { UpdateOperatingSettingsDto } from './dto/update-operating-settings.dto';
 import { UpdateOpeningHoursDto } from './dto/update-opening-hours.dto';
+import { CancelMyReservationDto } from './dto/cancel-my-reservation.dto';
 import {
   computeOpenCloseForLocalDay,
   hhMmToMinutes,
@@ -801,6 +802,89 @@ export class RestaurantsService {
         },
       },
     } as any)) as CustomerReservationListItem[];
+  }
+
+  async cancelMyReservation(
+    reservationId: string,
+    customer: SafeUser,
+    dto: CancelMyReservationDto,
+  ): Promise<CustomerReservationListItem> {
+    if (customer.role !== Role.CUSTOMER) {
+      throw new ForbiddenException('Only customers can cancel via this endpoint');
+    }
+
+    const myReservationInclude = {
+      restaurant: { select: { id: true, name: true, city: true, area: true } },
+      table: { select: { id: true, name: true, capacity: true } },
+      statusHistory: {
+        orderBy: { createdAt: 'asc' } as const,
+        select: {
+          fromStatus: true,
+          toStatus: true,
+          note: true,
+          createdAt: true,
+        },
+      },
+    };
+
+    return this.prisma.$transaction(async (tx) => {
+      const row = await tx.reservation.findFirst({
+        where: { id: reservationId, customerId: customer.id },
+        select: { id: true, status: true, startAt: true },
+      });
+      if (!row) {
+        throw new NotFoundException('Reservation not found');
+      }
+
+      const now = new Date();
+      if (now.getTime() >= new Date(row.startAt).getTime()) {
+        throw new BadRequestException(
+          'You cannot cancel a reservation after it has started.',
+        );
+      }
+
+      const allowed: ReservationStatus[] = [
+        ReservationStatus.PENDING,
+        ReservationStatus.HELD,
+        ReservationStatus.CONFIRMED,
+      ];
+      if (!allowed.includes(row.status)) {
+        if (row.status === ReservationStatus.CANCELLED) {
+          throw new BadRequestException('This reservation is already cancelled.');
+        }
+        if (row.status === ReservationStatus.REJECTED) {
+          throw new BadRequestException('A rejected reservation cannot be cancelled.');
+        }
+        if (row.status === ReservationStatus.COMPLETED) {
+          throw new BadRequestException('A completed reservation cannot be cancelled.');
+        }
+        throw new BadRequestException('This reservation cannot be cancelled.');
+      }
+
+      const note = dto.note?.trim()
+        ? dto.note.trim()
+        : 'Cancelled by customer';
+
+      await tx.reservationStatusHistory.create({
+        data: {
+          reservationId: row.id,
+          changedByUserId: customer.id,
+          fromStatus: row.status,
+          toStatus: ReservationStatus.CANCELLED,
+          note,
+        },
+      });
+
+      await tx.reservation.update({
+        where: { id: row.id },
+        data: { status: ReservationStatus.CANCELLED },
+      });
+
+      return (await tx.reservation.findFirstOrThrow({
+        where: { id: row.id },
+        include: myReservationInclude,
+      } as any)) as CustomerReservationListItem;
+    });
   }
 
   async listRestaurantReservations(
