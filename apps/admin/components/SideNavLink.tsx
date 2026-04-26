@@ -8,7 +8,7 @@ type Props = {
   label: string;
   /**
    * `prefix`: active when `pathname` equals `href` or is under that segment.
-   * `exact` (default): `pathname` must match `href` (use for `/dashboard` overview so child routes are not "Overview").
+   * `exact` (default): `pathname` must match `href` (e.g. `/dashboard` not `/dashboard/...` except when exact and path is /dashboard only).
    */
   match?: 'exact' | 'prefix';
 };
@@ -24,10 +24,10 @@ export function SideNavLink({ href, label, match = 'exact' }: Props) {
     <Link
       href={href}
       className={[
-        'block rounded-md px-3 py-2 text-sm font-medium transition-colors',
+        'block rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors',
         active
-          ? 'bg-white/15 text-white'
-          : 'text-zinc-300 hover:bg-white/10 hover:text-white',
+          ? 'border-l-2 border-amber-600 bg-zinc-200/60 pl-2 text-zinc-900'
+          : 'border-l-2 border-transparent pl-2 text-zinc-600 hover:bg-zinc-100/90 hover:text-zinc-900',
       ].join(' ')}
     >
       {label}

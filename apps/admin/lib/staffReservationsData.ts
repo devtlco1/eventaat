@@ -1,9 +1,11 @@
 import {
   listRestaurantEventReservations,
+  listRestaurantEvents,
   listRestaurantReservations,
   listRestaurants,
   type AdminEventReservation,
   type Restaurant,
+  type RestaurantEvent,
   type RestaurantReservation,
 } from './api';
 
@@ -54,4 +56,27 @@ export async function loadAllAccessibleEventReservations(
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
   return { restaurants, rows };
+}
+
+export async function loadAllAccessibleEventNights(
+  token: string,
+): Promise<{
+  restaurants: Restaurant[];
+  events: RestaurantEvent[];
+}> {
+  const restaurants = await listRestaurants(token);
+  const chunks = await Promise.all(
+    restaurants.map(async (r) => {
+      try {
+        return await listRestaurantEvents(token, r.id);
+      } catch {
+        return [] as RestaurantEvent[];
+      }
+    }),
+  );
+  const events = chunks.flat();
+  events.sort(
+    (a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime(),
+  );
+  return { restaurants, events };
 }

@@ -7,6 +7,7 @@ export {
   getNotificationAdminPath,
   globalEventReservationsPath,
   globalTableReservationsPath,
+  pendingBookingsPath,
 } from './reservationLinks';
 
 /** @deprecated use globalTableReservationsPath with same (restaurantId, reservationId) */

@@ -1,6 +1,6 @@
 import type { InAppNotification } from './api';
 
-/** Global workspace: table reservation list with optional highlight. */
+/** Business-facing: global list for table (restaurant) booking requests. */
 export function globalTableReservationsPath(q?: {
   restaurantId?: string;
   reservationId?: string;
@@ -9,10 +9,10 @@ export function globalTableReservationsPath(q?: {
   if (q?.restaurantId) p.set('restaurantId', q.restaurantId);
   if (q?.reservationId) p.set('reservationId', q.reservationId);
   const s = p.toString();
-  return `/dashboard/reservations/tables${s ? `?${s}` : ''}`;
+  return `/dashboard/bookings/restaurants${s ? `?${s}` : ''}`;
 }
 
-/** Global workspace: event reservation list with optional highlight. */
+/** Business-facing: global list for event night booking requests. */
 export function globalEventReservationsPath(q?: {
   restaurantId?: string;
   eventId?: string;
@@ -23,7 +23,12 @@ export function globalEventReservationsPath(q?: {
   if (q?.eventId) p.set('eventId', q.eventId);
   if (q?.eventReservationId) p.set('eventReservationId', q.eventReservationId);
   const s = p.toString();
-  return `/dashboard/reservations/events${s ? `?${s}` : ''}`;
+  return `/dashboard/bookings/events${s ? `?${s}` : ''}`;
+}
+
+/** Combined daily queue (table + event pending + recent). */
+export function pendingBookingsPath(): string {
+  return '/dashboard/bookings/pending';
 }
 
 /** Per-restaurant table list; bookmark and legacy deep links. */

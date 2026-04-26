@@ -127,7 +127,7 @@ Open: **http://localhost:3000/login**
 
 Use **localhost** in the browser, not the LAN IP, for the admin app during dev (Next dev is bound to your Mac).
 
-The post-login layout uses a **left sidebar** on `md+` viewports; on narrow screens, open **Menu** for the same items. The **Reservations** group in the nav includes **Operations** and the global **Table** / **Event** reservation list pages. Per-venue management still lives under **Restaurants** → a restaurant.
+The post-login layout uses a **left sidebar** on `md+` and **Menu** on small screens. Primary labels are **hospitality-facing** (e.g. **Bookings** with restaurant vs event guest lists, **Event nights**). Per-venue screens remain under **Restaurants**; global booking lists live under **Bookings** on the sidebar.
 
 ---
 

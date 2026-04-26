@@ -64,7 +64,7 @@ export default function DashboardLayout({
 
   return (
     <div className="flex min-h-dvh">
-      <aside className="hidden w-64 shrink-0 border-r border-zinc-800 bg-zinc-950 md:block">
+      <aside className="hidden w-64 shrink-0 border-r border-zinc-200 bg-white shadow-sm md:block">
         <div className="flex h-dvh max-h-dvh flex-col">
           <DashboardSidebar me={me} onLogout={logout} />
         </div>
