@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '../../../components/Button';
 import { Input } from '../../../components/Input';
+import { adminCard } from '../../../components/admin/adminShellClasses';
 import {
   getMe,
+  getRequestErrorMessage,
   patchMyPassword,
   patchMyProfile,
   type MeResponse,
@@ -42,9 +44,7 @@ export default function AccountPage() {
       try {
         await load();
       } catch (e) {
-        setErr(
-          e instanceof Error ? e.message : 'Failed to load account',
-        );
+        setErr(getRequestErrorMessage(e, 'Failed to load account'));
       } finally {
         setLoading(false);
       }
@@ -67,11 +67,7 @@ export default function AccountPage() {
       setErr(null);
       setOk('Profile saved.');
     } catch (e) {
-      setErr(
-        typeof e === 'object' && e && 'message' in e
-          ? String((e as { message: string }).message)
-          : 'Failed to save',
-      );
+      setErr(getRequestErrorMessage(e, 'Failed to save'));
     } finally {
       setSaving(false);
     }
@@ -94,11 +90,7 @@ export default function AccountPage() {
       setCurrentPassword('');
       setNewPassword('');
     } catch (e) {
-      setPwErr(
-        typeof e === 'object' && e && 'message' in e
-          ? String((e as { message: string }).message)
-          : 'Failed to change password',
-      );
+      setPwErr(getRequestErrorMessage(e, 'Failed to change password'));
     } finally {
       setPwBusy(false);
     }
@@ -129,7 +121,7 @@ export default function AccountPage() {
       </div>
 
       {user && (
-        <div className="rounded-lg border border-zinc-200 bg-white/90 p-4 text-sm dark:border-zinc-700/80 dark:bg-zinc-900/60">
+        <div className={adminCard + ' text-sm'}>
           <dl className="grid grid-cols-1 gap-2 sm:grid-cols-[7rem_1fr] sm:gap-x-2">
             <dt className="text-zinc-500 dark:text-zinc-400">Email</dt>
             <dd className="text-zinc-900 dark:text-zinc-100">{user.email}</dd>
@@ -149,7 +141,7 @@ export default function AccountPage() {
 
       <form
         onSubmit={onSaveProfile}
-        className="rounded-lg border border-zinc-200 bg-white/90 p-4 dark:border-zinc-700/80 dark:bg-zinc-900/60"
+        className={adminCard}
       >
         <h2 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
           Profile
@@ -189,7 +181,7 @@ export default function AccountPage() {
 
       <form
         onSubmit={onChangePassword}
-        className="rounded-lg border border-zinc-200 bg-white/90 p-4 dark:border-zinc-700/80 dark:bg-zinc-900/60"
+        className={adminCard}
       >
         <h2 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
           Change password

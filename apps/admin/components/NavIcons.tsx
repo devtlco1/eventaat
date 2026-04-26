@@ -29,3 +29,12 @@ export function IconPanelLeftClose(props: SVGProps<SVGSVGElement>) {
 export function IconPanelLeftOpen(props: SVGProps<SVGSVGElement>) {
   return <svg {...base} {...props}><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M15 9h2" /><path d="M15 12h4" /><path d="M9 3v18" /></svg>;
 }
+export function IconLogOut(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="M16 17l5-5-5-5" />
+      <path d="M21 12H9" />
+    </svg>
+  );
+}

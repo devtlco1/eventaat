@@ -2,7 +2,14 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AdminFilterBar } from '../../../../components/admin/AdminFilterBar';
+import {
+  adminInputClass,
+  adminSelectClass,
+  adminTableWrap,
+  adminThead,
+} from '../../../../components/admin/adminShellClasses';
 import { AdminEmptyState } from '../../../../components/admin/AdminEmptyState';
 import { AdminErrorState } from '../../../../components/admin/AdminErrorState';
 import { AdminPageHeader } from '../../../../components/admin/AdminPageHeader';
@@ -14,6 +21,7 @@ import { Modal } from '../../../../components/Modal';
 import {
   createAdminTableReservation,
   getMe,
+  getRequestErrorMessage,
   listUsers,
   type AdminReservationStatus,
   type MeResponse,
@@ -67,6 +75,11 @@ function fmt(dt: string) {
   return isNaN(d.getTime()) ? dt : d.toLocaleString();
 }
 
+function shortBookingId(id: string) {
+  if (id.length <= 8) return `Booking #${id}`;
+  return `Booking #${id.slice(0, 8)}`;
+}
+
 function includesCustomer(r: RestaurantReservation, q: string) {
   const t = q.trim().toLowerCase();
   if (!t) return true;
@@ -111,6 +124,9 @@ export default function GlobalTableReservationsPage() {
     endLocal: '',
     specialRequest: '',
   });
+  const [historyFor, setHistoryFor] = useState<RestaurantReservation | null>(
+    null,
+  );
 
   const isPa = me?.role === 'PLATFORM_ADMIN';
   const canManage = me?.role === 'PLATFORM_ADMIN' || me?.role === 'RESTAURANT_ADMIN';
@@ -238,9 +254,7 @@ export default function GlobalTableReservationsPage() {
       setError(
         code === 403
           ? 'No permission to update this restaurant.'
-          : typeof err === 'object' && err && 'message' in err
-            ? String((err as { message: string }).message)
-            : 'Update failed',
+          : getRequestErrorMessage(err, 'Update failed'),
       );
     } finally {
       setUpdating((m) => ({ ...m, [reservationId]: false }));
@@ -297,7 +311,10 @@ export default function GlobalTableReservationsPage() {
       await refresh();
     } catch (e) {
       setAddErr(
-        e instanceof Error ? e.message : 'Could not create booking. Check times and id.',
+        getRequestErrorMessage(
+          e,
+          'Could not create booking. Check times and id.',
+        ),
       );
     } finally {
       setAddBusy(false);
@@ -334,11 +351,11 @@ export default function GlobalTableReservationsPage() {
         </p>
       ) : null}
 
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="text-sm text-zinc-700 dark:text-zinc-200">
-          <span className="mr-2">Restaurant</span>
+      <AdminFilterBar>
+        <label className="text-sm text-zinc-800 dark:text-zinc-200">
+          <span className="mb-0.5 block">Restaurant</span>
           <select
-            className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
+            className={adminSelectClass + ' min-w-[10rem] text-zinc-900 dark:text-zinc-100'}
             value={restFilter}
             onChange={(e) => setRestFilter(e.target.value)}
           >
@@ -350,10 +367,10 @@ export default function GlobalTableReservationsPage() {
             ))}
           </select>
         </label>
-        <label className="text-sm text-zinc-700 dark:text-zinc-200">
-          <span className="mr-2">Status</span>
+        <label className="text-sm text-zinc-800 dark:text-zinc-200">
+          <span className="mb-0.5 block">Status</span>
           <select
-            className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
+            className={adminSelectClass + ' min-w-[8rem] text-zinc-900 dark:text-zinc-100'}
             value={statusFilter}
             onChange={(e) =>
               setStatusFilter(e.target.value as ReservationStatus | 'ALL')
@@ -366,20 +383,20 @@ export default function GlobalTableReservationsPage() {
             ))}
           </select>
         </label>
-        <label className="text-sm text-zinc-700 dark:text-zinc-200">
-          <span className="mr-2 block sm:inline">From date</span>
+        <label className="text-sm text-zinc-800 dark:text-zinc-200">
+          <span className="mb-0.5 block">From date</span>
           <input
             type="date"
-            className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800"
+            className={adminInputClass}
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
           />
         </label>
-        <label className="text-sm text-zinc-700 dark:text-zinc-200">
-          <span className="mr-2 block sm:inline">To date</span>
+        <label className="text-sm text-zinc-800 dark:text-zinc-200">
+          <span className="mb-0.5 block">To date</span>
           <input
             type="date"
-            className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800"
+            className={adminInputClass}
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
           />
@@ -408,17 +425,12 @@ export default function GlobalTableReservationsPage() {
         <Button type="button" variant="secondary" onClick={refresh}>
           Refresh
         </Button>
-      </div>
+      </AdminFilterBar>
 
-      <p className="text-[11px] text-zinc-500 dark:text-zinc-500">
-        List paging is in the browser (default 20 rows). Server-side pagination
-        is a future improvement.
-      </p>
-
-      <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/60">
+      <div className={'overflow-hidden ' + adminTableWrap}>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="bg-zinc-50 text-xs uppercase text-zinc-500 dark:bg-zinc-800/80 dark:text-zinc-400">
+            <thead className={adminThead}>
               <tr>
                 <th className="px-3 py-2">Type / ID</th>
                 <th className="px-3 py-2">Restaurant</th>
@@ -430,7 +442,7 @@ export default function GlobalTableReservationsPage() {
                 <th className="px-3 py-2">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-200">
+            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-700/60">
               {loading ? (
                 <tr>
                   <td
@@ -453,66 +465,67 @@ export default function GlobalTableReservationsPage() {
               ) : (
                 paged.map((r) => {
                   const busy = !!updating[r.id];
-                  const terminal =
-                    r.status === 'CANCELLED' ||
-                    r.status === 'COMPLETED' ||
-                    r.status === 'REJECTED';
+                  const s = r.status;
                   const canCancelThis =
-                    r.status === 'PENDING' ||
-                    r.status === 'HELD' ||
-                    r.status === 'CONFIRMED';
-                  const disableActions = !canManage || busy || terminal;
+                    s === 'PENDING' ||
+                    s === 'HELD' ||
+                    s === 'CONFIRMED';
+                  const canAct = canManage && !busy;
                   const history = r.statusHistory ?? [];
                   return (
-                    <Fragment key={r.id}>
-                      <tr
+                    <tr
+                      key={r.id}
                         id={`admin-table-resv-${r.id}`}
                         className={
                           highlightReservationId === r.id
                             ? 'bg-amber-50/70 ring-1 ring-amber-300 dark:bg-amber-950/30 dark:ring-amber-700/60'
-                            : 'hover:bg-zinc-50/80 dark:hover:bg-zinc-800/50'
+                            : 'hover:bg-zinc-50/80 dark:hover:bg-zinc-800/45'
                         }
                       >
-                        <td className="px-3 py-2 align-top text-xs">
-                          <span className="font-semibold text-zinc-800 dark:text-zinc-200">
-                            TABLE
-                          </span>
-                          <div className="mt-0.5 break-all text-[10px] text-zinc-500">
-                            {r.id}
+                        <td
+                          className="px-3 py-2 align-top text-xs text-zinc-800 dark:text-zinc-200"
+                          title={r.id}
+                        >
+                          <span className="font-semibold">TABLE</span>
+                          <div className="mt-0.5 font-mono text-[11px] text-zinc-600 dark:text-zinc-400">
+                            {shortBookingId(r.id)}
                           </div>
                         </td>
-                        <td className="px-3 py-2 align-top text-zinc-800">
+                        <td className="px-3 py-2 align-top text-zinc-800 dark:text-zinc-200">
                           {r.restaurant?.name ?? '—'}
                           <div>
                             <Link
-                              className="text-xs text-zinc-600 underline"
-                              href={perRestaurantTableReservationsPath(r.restaurantId)}
+                              className="text-xs text-amber-800 underline dark:text-amber-300/90"
+                              href={perRestaurantTableReservationsPath(
+                                r.restaurantId,
+                              )}
                             >
-                              Venue list
+                              Venue
                             </Link>
-                          </div>
-                          <div>
+                            <span className="text-zinc-400"> · </span>
                             <Link
-                              className="text-xs text-zinc-500 underline"
+                              className="text-xs text-zinc-600 underline dark:text-zinc-400"
                               href={globalTableReservationsPath({
                                 restaurantId: r.restaurantId,
                                 reservationId: r.id,
                               })}
                             >
-                              Link
+                              Copy link
                             </Link>
                           </div>
                         </td>
                         <td className="px-3 py-2 align-top">
-                          <div className="text-zinc-900">
+                          <div className="text-zinc-900 dark:text-zinc-100">
                             {r.customer?.fullName ?? '—'}
                           </div>
-                          <div className="text-xs text-zinc-500">
+                          <div className="text-xs text-zinc-500 dark:text-zinc-500">
                             {r.customer?.email ?? '—'}
                           </div>
                         </td>
-                        <td className="px-3 py-2">{r.partySize}</td>
-                        <td className="px-3 py-2 text-xs text-zinc-700">
+                        <td className="px-3 py-2 text-zinc-800 dark:text-zinc-200">
+                          {r.partySize}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-zinc-700 dark:text-zinc-300">
                           {fmt(r.startAt)} — {fmt(r.endAt)}
                         </td>
                         <td className="px-3 py-2">
@@ -520,10 +533,10 @@ export default function GlobalTableReservationsPage() {
                             {r.status}
                           </AdminStatusBadge>
                         </td>
-                        <td className="max-w-[12rem] px-3 py-2 text-xs text-zinc-600">
+                        <td className="max-w-[12rem] px-3 py-2 text-xs text-zinc-600 dark:text-zinc-400">
                           {r.note || r.specialRequest || '—'}
                           {r.rejectionReason ? (
-                            <div className="mt-0.5 text-amber-900/90">
+                            <div className="mt-0.5 text-amber-900/90 dark:text-amber-200/80">
                               Reject: {r.rejectionReason}
                             </div>
                           ) : null}
@@ -533,87 +546,101 @@ export default function GlobalTableReservationsPage() {
                             </div>
                           ) : null}
                         </td>
-                        <td className="px-3 py-2">
-                          <div className="flex max-w-xs flex-col gap-1">
-                            <div className="flex flex-wrap gap-1">
-                              <Button
-                                variant="secondary"
-                                onClick={() =>
-                                  setStatus(r.restaurantId, r.id, 'HELD')
-                                }
-                                disabled={disableActions || r.status !== 'PENDING'}
-                              >
-                                Hold
-                              </Button>
-                              <Button
-                                variant="secondary"
-                                onClick={() =>
-                                  setStatus(r.restaurantId, r.id, 'CONFIRMED')
-                                }
-                                disabled={
-                                  disableActions ||
-                                  (r.status !== 'PENDING' && r.status !== 'HELD')
-                                }
-                              >
-                                Confirm
-                              </Button>
-                              <Button
-                                variant="secondary"
-                                onClick={() =>
-                                  rejectWithPrompt(r.restaurantId, r.id)
-                                }
-                                disabled={
-                                  disableActions ||
-                                  (r.status !== 'PENDING' && r.status !== 'HELD')
-                                }
-                              >
-                                Reject
-                              </Button>
-                              <Button
-                                variant="secondary"
-                                onClick={() =>
-                                  setStatus(r.restaurantId, r.id, 'CANCELLED')
-                                }
-                                disabled={disableActions || !canCancelThis}
-                              >
-                                Cancel
-                              </Button>
-                              <Button
-                                variant="secondary"
-                                onClick={() =>
-                                  setStatus(r.restaurantId, r.id, 'COMPLETED')
-                                }
-                                disabled={
-                                  disableActions || r.status !== 'CONFIRMED'
-                                }
-                              >
-                                Complete
-                              </Button>
+                        <td className="px-3 py-2 align-top">
+                          {!canAct ? (
+                            <span className="text-xs text-zinc-500">—</span>
+                          ) : s === 'CANCELLED' ||
+                            s === 'COMPLETED' ||
+                            s === 'REJECTED' ? (
+                            <span className="text-xs text-zinc-500">—</span>
+                          ) : (
+                            <div className="flex max-w-[14rem] flex-col gap-1.5">
+                              <div className="flex flex-wrap gap-1">
+                                {s === 'PENDING' ? (
+                                  <Button
+                                    variant="secondary"
+                                    className="!px-2 !py-0.5 !text-xs"
+                                    onClick={() =>
+                                      setStatus(r.restaurantId, r.id, 'HELD')
+                                    }
+                                  >
+                                    Hold
+                                  </Button>
+                                ) : null}
+                                {s === 'PENDING' || s === 'HELD' ? (
+                                  <>
+                                    <Button
+                                      variant="secondary"
+                                      className="!px-2 !py-0.5 !text-xs"
+                                      onClick={() =>
+                                        setStatus(
+                                          r.restaurantId,
+                                          r.id,
+                                          'CONFIRMED',
+                                        )
+                                      }
+                                    >
+                                      Confirm
+                                    </Button>
+                                    <Button
+                                      variant="secondary"
+                                      className="!px-2 !py-0.5 !text-xs"
+                                      onClick={() =>
+                                        rejectWithPrompt(
+                                          r.restaurantId,
+                                          r.id,
+                                        )
+                                      }
+                                    >
+                                      Reject
+                                    </Button>
+                                  </>
+                                ) : null}
+                                {canCancelThis ? (
+                                  <Button
+                                    variant="secondary"
+                                    className="!px-2 !py-0.5 !text-xs"
+                                    onClick={() =>
+                                      setStatus(
+                                        r.restaurantId,
+                                        r.id,
+                                        'CANCELLED',
+                                      )
+                                    }
+                                  >
+                                    Cancel
+                                  </Button>
+                                ) : null}
+                                {s === 'CONFIRMED' ? (
+                                  <Button
+                                    variant="secondary"
+                                    className="!px-2 !py-0.5 !text-xs"
+                                    onClick={() =>
+                                      setStatus(
+                                        r.restaurantId,
+                                        r.id,
+                                        'COMPLETED',
+                                      )
+                                    }
+                                  >
+                                    Complete
+                                  </Button>
+                                ) : null}
+                              </div>
+                              {history.length > 0 ? (
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  className="!h-7 w-fit !px-2 !text-xs"
+                                  onClick={() => setHistoryFor(r)}
+                                >
+                                  History ({history.length})
+                                </Button>
+                              ) : null}
                             </div>
-                          </div>
+                          )}
                         </td>
                       </tr>
-                      {history.length > 0 ? (
-                        <tr className="bg-zinc-50/50">
-                          <td colSpan={8} className="px-3 py-1">
-                            <details>
-                              <summary className="cursor-pointer text-xs text-zinc-600">
-                                History ({history.length})
-                              </summary>
-                              <ul className="mt-1 list-none text-xs text-zinc-500">
-                                {history.map((h) => (
-                                  <li key={h.id}>
-                                    {fmt(h.createdAt)}: {h.fromStatus ?? '—'} →{' '}
-                                    {h.toStatus}
-                                    {h.note ? ` · ${h.note}` : ''}
-                                  </li>
-                                ))}
-                              </ul>
-                            </details>
-                          </td>
-                        </tr>
-                      ) : null}
-                    </Fragment>
                   );
                 })
               )}
@@ -630,6 +657,43 @@ export default function GlobalTableReservationsPage() {
           total={total}
         />
       </div>
+
+      <Modal
+        title={
+          historyFor
+            ? `Status history — ${shortBookingId(historyFor.id)}`
+            : 'History'
+        }
+        open={!!historyFor}
+        onClose={() => setHistoryFor(null)}
+        footer={
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setHistoryFor(null)}
+            >
+              Close
+            </Button>
+          </div>
+        }
+      >
+        {historyFor ? (
+          <div className="text-sm text-zinc-800 dark:text-zinc-200">
+            <p className="mb-2 font-mono text-xs text-zinc-500" title={historyFor.id}>
+              {historyFor.id}
+            </p>
+            <ul className="list-none space-y-1.5 text-xs text-zinc-600 dark:text-zinc-400">
+              {(historyFor.statusHistory ?? []).map((h) => (
+                <li key={h.id}>
+                  {fmt(h.createdAt)}: {h.fromStatus ?? '—'} → {h.toStatus}
+                  {h.note ? ` — ${h.note}` : ''}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </Modal>
 
       <Modal
         title="Add restaurant booking"

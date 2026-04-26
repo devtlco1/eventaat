@@ -5,8 +5,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AdminErrorState } from '../../components/admin/AdminErrorState';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
 import { AdminStatusBadge } from '../../components/admin/AdminStatusBadge';
+import { adminThead } from '../../components/admin/adminShellClasses';
 import {
   getMe,
+  getRequestErrorMessage,
   listRestaurants,
   type MeResponse,
   type Restaurant,
@@ -116,7 +118,7 @@ export default function DashboardPage() {
       try {
         await load();
       } catch (e) {
-        setErr(e instanceof Error ? e.message : 'Failed to load');
+        setErr(getRequestErrorMessage(e, 'Failed to load'));
       } finally {
         setLoading(false);
       }
@@ -162,7 +164,7 @@ export default function DashboardPage() {
     <div className="space-y-8">
       <AdminPageHeader
         title="Dashboard"
-        description="Overview of restaurants, restaurant table bookings, and event nights in your scope."
+        description="Restaurants, table-booking activity, and event nights in your access scope."
       />
 
       {isStaff ? (
@@ -218,9 +220,9 @@ export default function DashboardPage() {
               View all
             </Link>
           </div>
-          <div className="overflow-x-auto rounded-lg border border-zinc-200/90 bg-white text-sm dark:border-zinc-700/80 dark:bg-zinc-900/70">
+          <div className="overflow-x-auto rounded-lg border border-zinc-200/90 bg-white text-sm shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/70">
             <table className="min-w-full text-left text-xs sm:text-sm">
-              <thead className="bg-zinc-50 text-zinc-500 dark:bg-zinc-800/80 dark:text-zinc-400">
+              <thead className={adminThead}>
                 <tr>
                   <th className="px-3 py-2">When</th>
                   <th className="px-3 py-2">Restaurant</th>
@@ -228,17 +230,20 @@ export default function DashboardPage() {
                   <th className="px-3 py-2">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-700/80">
+              <tbody className="divide-y divide-zinc-200/90 dark:divide-zinc-700/60">
                 {latestTable.map((r) => (
-                  <tr key={r.id} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40">
+                  <tr
+                    key={r.id}
+                    className="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/45"
+                  >
                     <td className="px-3 py-2 text-zinc-600 dark:text-zinc-300">
                       {fmt(r.startAt)}
                     </td>
                     <td className="px-3 py-2 text-zinc-800 dark:text-zinc-100">
-                      {r.restaurant.name}
+                      {r.restaurant?.name ?? '—'}
                     </td>
                     <td className="px-3 py-2">
-                      {r.customer.fullName} · {r.partySize}
+                      {r.customer?.fullName ?? '—'} · {r.partySize}
                     </td>
                     <td className="px-3 py-2">
                       <AdminStatusBadge tone={rsvTone(r.status)}>
@@ -250,16 +255,6 @@ export default function DashboardPage() {
               </tbody>
             </table>
           </div>
-          <p className="mt-1.5 text-[11px] text-zinc-500 dark:text-zinc-500">
-            <Link
-              className="underline"
-              href="/dashboard/bookings/restaurants"
-            >
-              Open restaurant bookings
-            </Link>{' '}
-            to confirm, reject, or change status. Event-night marketing events are
-            under Event nights.
-          </p>
         </section>
       ) : null}
 
@@ -276,18 +271,21 @@ export default function DashboardPage() {
               View all
             </Link>
           </div>
-          <div className="overflow-x-auto rounded-lg border border-zinc-200/90 bg-white text-sm dark:border-zinc-700/80 dark:bg-zinc-900/70">
+          <div className="overflow-x-auto rounded-lg border border-zinc-200/90 bg-white text-sm shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/70">
             <table className="min-w-full text-left text-xs sm:text-sm">
-              <thead className="bg-zinc-50 text-zinc-500 dark:bg-zinc-800/80 dark:text-zinc-400">
+              <thead className={adminThead}>
                 <tr>
                   <th className="px-3 py-2">Starts</th>
                   <th className="px-3 py-2">Title</th>
                   <th className="px-3 py-2">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-700/80">
+              <tbody className="divide-y divide-zinc-200/90 dark:divide-zinc-700/60">
                 {latestNights.map((e) => (
-                  <tr key={e.id} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40">
+                  <tr
+                    key={e.id}
+                    className="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/45"
+                  >
                     <td className="px-3 py-2 text-zinc-600 dark:text-zinc-300">
                       {fmt(e.startsAt)}
                     </td>

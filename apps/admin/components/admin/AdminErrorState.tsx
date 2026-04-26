@@ -1,6 +1,18 @@
-type Props = { children: React.ReactNode; className?: string };
+import { Button } from '../Button';
 
-export function AdminErrorState({ children, className = '' }: Props) {
+type Props = {
+  children: React.ReactNode;
+  className?: string;
+  onRetry?: () => void;
+  retryLabel?: string;
+};
+
+export function AdminErrorState({
+  children,
+  className = '',
+  onRetry,
+  retryLabel = 'Retry',
+}: Props) {
   return (
     <div
       className={[
@@ -8,7 +20,19 @@ export function AdminErrorState({ children, className = '' }: Props) {
         className,
       ].join(' ')}
     >
-      {children}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0 flex-1">{children}</div>
+        {onRetry ? (
+          <Button
+            type="button"
+            variant="secondary"
+            className="!shrink-0"
+            onClick={onRetry}
+          >
+            {retryLabel}
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }

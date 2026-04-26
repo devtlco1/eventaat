@@ -4,6 +4,12 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge } from '../../../components/Badge';
+import { AdminFilterBar } from '../../../components/admin/AdminFilterBar';
+import {
+  adminSelectClass,
+  adminThead,
+  adminTableWrap,
+} from '../../../components/admin/adminShellClasses';
 import { AdminPaginationBar } from '../../../components/AdminPaginationBar';
 import { AdminEmptyState } from '../../../components/admin/AdminEmptyState';
 import { Button } from '../../../components/Button';
@@ -13,6 +19,7 @@ import {
   createRestaurant,
   getMe,
   getOperatingSettings,
+  getRequestErrorMessage,
   listRestaurants,
   type CreateRestaurantInput,
   type MeResponse,
@@ -170,11 +177,7 @@ export default function RestaurantsPage() {
       setTimeout(() => setSuccess(null), 3000);
       await refresh();
     } catch (err) {
-      setError(
-        typeof err === 'object' && err && 'message' in err
-          ? String((err as { message: string }).message)
-          : 'Failed to create restaurant',
-      );
+      setError(getRequestErrorMessage(err, 'Failed to create restaurant'));
     } finally {
       setSubmitting(false);
     }
@@ -203,7 +206,7 @@ export default function RestaurantsPage() {
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-end gap-3">
+      <AdminFilterBar>
         <div className="min-w-[10rem] flex-1 sm:max-w-xs">
           <Input
             label="Search name"
@@ -223,7 +226,7 @@ export default function RestaurantsPage() {
         <label className="text-sm text-zinc-800 dark:text-zinc-200">
           <span className="mb-0.5 block">Active</span>
           <select
-            className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800"
+            className={adminSelectClass + ' min-w-[7rem] text-zinc-900 dark:text-zinc-100'}
             value={active}
             onChange={(e) => setActive(e.target.value as typeof active)}
           >
@@ -235,7 +238,7 @@ export default function RestaurantsPage() {
         <label className="text-sm text-zinc-800 dark:text-zinc-200">
           <span className="mb-0.5 block">Accepts reservations</span>
           <select
-            className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800"
+            className={adminSelectClass + ' min-w-[7rem] text-zinc-900 dark:text-zinc-100'}
             value={accFilter}
             onChange={(e) => setAccFilter(e.target.value as typeof accFilter)}
           >
@@ -252,12 +255,7 @@ export default function RestaurantsPage() {
         <Button type="button" variant="secondary" onClick={() => void refresh()}>
           Refresh
         </Button>
-      </div>
-
-      <p className="text-[11px] text-zinc-500">
-        Table paging is client-side (default 20). “Accepts reservations” uses
-        operating settings per restaurant.
-      </p>
+      </AdminFilterBar>
 
       {me && !canCreate ? (
         <div className="rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-700 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/70">
@@ -266,10 +264,10 @@ export default function RestaurantsPage() {
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900/60">
+      <div className={'overflow-hidden ' + adminTableWrap}>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="bg-zinc-50 text-xs uppercase text-zinc-500 dark:bg-zinc-800/80 dark:text-zinc-400">
+            <thead className={adminThead}>
               <tr>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">City</th>
@@ -279,7 +277,7 @@ export default function RestaurantsPage() {
                 <th className="px-4 py-3">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-700/80">
+            <tbody className="divide-y divide-zinc-200/90 dark:divide-zinc-700/60">
               {loading ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-6 text-zinc-500">
@@ -321,12 +319,20 @@ export default function RestaurantsPage() {
                       </Badge>
                     </td>
                     <td className="px-4 py-3">
-                      <Link
-                        className="text-sm font-medium text-amber-800 underline dark:text-amber-300/90"
-                        href={`/dashboard/restaurants/${r.id}/settings`}
-                      >
-                        Settings
-                      </Link>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
+                        <Link
+                          className="font-medium text-amber-800 underline dark:text-amber-300/90"
+                          href={`/dashboard/restaurants/${r.id}/profile`}
+                        >
+                          View
+                        </Link>
+                        <Link
+                          className="font-medium text-zinc-800 underline dark:text-zinc-300"
+                          href={`/dashboard/restaurants/${r.id}/settings`}
+                        >
+                          Settings
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))

@@ -2,12 +2,15 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AdminFilterBar } from '../../../components/admin/AdminFilterBar';
+import { adminSelectClass } from '../../../components/admin/adminShellClasses';
 import { AdminEmptyState } from '../../../components/admin/AdminEmptyState';
 import { AdminErrorState } from '../../../components/admin/AdminErrorState';
 import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
 import { AdminPaginationBar } from '../../../components/AdminPaginationBar';
 import { Button } from '../../../components/Button';
 import {
+  getRequestErrorMessage,
   listMyNotifications,
   markAllNotificationsRead,
   markNotificationRead,
@@ -34,16 +37,27 @@ export default function AdminNotificationsPage() {
   const [typeFilter, setTypeFilter] = useState<string>('all');
 
   const load = useCallback(async () => {
-    const token = getToken();
-    if (!token) return;
     setErr(null);
+    const token = getToken();
+    if (!token) {
+      setRows([]);
+      setUnreadCount(0);
+      setLoading(false);
+      setErr('Not signed in. Log in again from the home page.');
+      return;
+    }
     setLoading(true);
     try {
       const data = await listMyNotifications(token, { limit: 100 });
       setRows(data.notifications);
       setUnreadCount(data.unreadCount);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Failed to load');
+      setErr(
+        getRequestErrorMessage(
+          e,
+          'Could not load notifications. Check the API URL and your session.',
+        ),
+      );
     } finally {
       setLoading(false);
     }
@@ -66,7 +80,7 @@ export default function AdminNotificationsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [readMode, setPage]);
+  }, [readMode, typeFilter, setPage]);
 
   const typeOptions = useMemo(() => {
     const s = new Set<string>();
@@ -86,18 +100,28 @@ export default function AdminNotificationsPage() {
   async function openNotification(n: InAppNotification) {
     setErr(null);
     setNavErr(null);
-    if (!getToken()) return;
+    if (!getToken()) {
+      setErr('Not signed in.');
+      return;
+    }
     try {
       if (!n.readAt) {
         await markReadIfNeeded(n);
       }
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Failed to mark read');
+      setErr(
+        getRequestErrorMessage(
+          e,
+          'Could not mark this notification as read.',
+        ),
+      );
       return;
     }
     const path = getNotificationAdminPath(n);
     if (!path) {
-      setNavErr('Cannot open: missing restaurant or reservation id on this notification.');
+      setNavErr(
+        'This notification is missing a link target. Try again after refreshing.',
+      );
       return;
     }
     router.push(path.path);
@@ -106,12 +130,20 @@ export default function AdminNotificationsPage() {
   async function onReadAll() {
     const token = getToken();
     if (!token) return;
+    setErr(null);
     try {
       await markAllNotificationsRead(token);
-      setRows((r) => r.map((x) => ({ ...x, readAt: x.readAt ?? new Date().toISOString() })));
+      setRows((r) =>
+        r.map((x) => ({ ...x, readAt: x.readAt ?? new Date().toISOString() })),
+      );
       setUnreadCount(0);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Failed to mark all read');
+      setErr(
+        getRequestErrorMessage(
+          e,
+          'Could not mark all as read. Try again or refresh the page.',
+        ),
+      );
     }
   }
 
@@ -119,9 +151,13 @@ export default function AdminNotificationsPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Notifications"
-        description="In-app list only. Click a row to mark read and go to the linked area when available. No email or push yet."
+        description="Click a row to mark it read and open the linked page when a link is available."
       />
-      {err ? <AdminErrorState>{err}</AdminErrorState> : null}
+      {err && !loading ? (
+        <AdminErrorState onRetry={() => void load()}>
+          {err}
+        </AdminErrorState>
+      ) : null}
       {navErr ? (
         <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-200/90">
           {navErr}
@@ -132,30 +168,32 @@ export default function AdminNotificationsPage() {
           {unreadCount} unread
           {loading ? ' — loading' : null}
         </p>
-        {unreadCount > 0 ? (
-          <Button variant="secondary" type="button" onClick={() => void onReadAll()}>
+        {unreadCount > 0 && !err ? (
+          <Button
+            variant="secondary"
+            type="button"
+            onClick={() => void onReadAll()}
+          >
             Mark all as read
           </Button>
         ) : null}
       </div>
-      <div className="flex flex-wrap items-end gap-3">
+      <AdminFilterBar>
         <label className="text-sm text-zinc-800 dark:text-zinc-200">
-          <span className="mr-2">Inbox</span>
+          <span className="mb-0.5 block">Inbox</span>
           <select
-            className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800"
+            className={adminSelectClass}
             value={readMode}
-            onChange={(e) =>
-              setReadMode(e.target.value as 'all' | 'unread')
-            }
+            onChange={(e) => setReadMode(e.target.value as 'all' | 'unread')}
           >
             <option value="all">All</option>
             <option value="unread">Unread only</option>
           </select>
         </label>
         <label className="text-sm text-zinc-800 dark:text-zinc-200">
-          <span className="mr-2">Type</span>
+          <span className="mb-0.5 block">Type</span>
           <select
-            className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800"
+            className={adminSelectClass}
             value={typeFilter}
             onChange={(e) => {
               setTypeFilter(e.target.value);
@@ -169,26 +207,26 @@ export default function AdminNotificationsPage() {
             ))}
           </select>
         </label>
-      </div>
-      <p className="text-[11px] text-zinc-500">
-        Loads up to 100 items; extra filtering is in the browser. Paging default 20.
-      </p>
+      </AdminFilterBar>
+      {loading && rows.length === 0 && !err ? (
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">Loading…</p>
+      ) : null}
       <ul className="space-y-2">
-        {rows.length === 0 && !loading ? (
+        {!err && !loading && rows.length === 0 ? (
           <li>
-            <AdminEmptyState>No notifications.</AdminEmptyState>
+            <AdminEmptyState>No notifications yet.</AdminEmptyState>
           </li>
         ) : null}
-        {paged.map((n) => {
+        {!err && paged.map((n) => {
           const unread = !n.readAt;
           return (
             <li
               key={n.id}
               className={
-                'cursor-pointer rounded-md border p-3 text-sm ' +
+                'cursor-pointer rounded-lg border p-3 text-sm transition-colors ' +
                 (unread
-                  ? 'border-sky-200 bg-sky-50 dark:border-sky-800/60 dark:bg-sky-950/30'
-                  : 'border-zinc-200 bg-white dark:border-zinc-700/80 dark:bg-zinc-900/60')
+                  ? 'border-sky-200/90 bg-sky-50/90 dark:border-sky-800/50 dark:bg-sky-950/30'
+                  : 'border-zinc-200/90 bg-white dark:border-zinc-700/60 dark:bg-zinc-900/50')
               }
               onClick={() => void openNotification(n)}
               onKeyDown={(e) => {
@@ -203,15 +241,17 @@ export default function AdminNotificationsPage() {
               <div className="font-medium text-zinc-900 dark:text-zinc-100">
                 {n.title}
               </div>
-              <p className="mt-1 text-zinc-700 dark:text-zinc-300">{n.message}</p>
-              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
-                {fmt(n.createdAt)} — {n.type} — click to open
+              <p className="mt-1 text-zinc-700 dark:text-zinc-300">
+                {n.message}
+              </p>
+              <p className="mt-1 text-xs text-zinc-500">
+                {fmt(n.createdAt)} — {n.type}
               </p>
             </li>
           );
         })}
       </ul>
-      {filtered.length > 0 ? (
+      {filtered.length > 0 && !err ? (
         <AdminPaginationBar
           page={page}
           pageCount={pageCount}

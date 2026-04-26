@@ -3,6 +3,13 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AdminFilterBar } from '../../../components/admin/AdminFilterBar';
+import {
+  adminInputClass,
+  adminSelectClass,
+  adminThead,
+  adminTableWrap,
+} from '../../../components/admin/adminShellClasses';
 import { AdminEmptyState } from '../../../components/admin/AdminEmptyState';
 import { AdminErrorState } from '../../../components/admin/AdminErrorState';
 import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
@@ -14,6 +21,7 @@ import { Modal } from '../../../components/Modal';
 import {
   createRestaurantEvent,
   getMe,
+  getRequestErrorMessage,
   reviewRestaurantEvent,
   type CreateRestaurantEventInput,
   type MeResponse,
@@ -127,14 +135,17 @@ export default function EventNightsPage() {
 
   useEffect(() => {
     (async () => {
-      if (!getToken()) return;
+      if (!getToken()) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       setError(null);
       try {
         await load();
       } catch (e) {
         setError(
-          e instanceof Error ? e.message : 'Failed to load event nights',
+          getRequestErrorMessage(e, 'Failed to load event nights'),
         );
       } finally {
         setLoading(false);
@@ -211,7 +222,7 @@ export default function EventNightsPage() {
       });
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Update failed');
+      setError(getRequestErrorMessage(e, 'Update failed'));
     } finally {
       setUpdating((m) => {
         const n = { ...m };
@@ -286,7 +297,10 @@ export default function EventNightsPage() {
       await load();
     } catch (e) {
       setCreateErr(
-        e instanceof Error ? e.message : 'Create failed. Check required fields and times.',
+        getRequestErrorMessage(
+          e,
+          'Create failed. Check required fields and times.',
+        ),
       );
     } finally {
       setCreateBusy(false);
@@ -303,7 +317,7 @@ export default function EventNightsPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Event nights"
-        description="Marketable event nights per venue. Guest bookings for a night are handled in the mobile app; this list is the events themselves (usually PENDING until the platform approves)."
+        description="Event listings per restaurant. PENDING events need platform approval before they appear to customers."
       />
       {error ? <AdminErrorState>{error}</AdminErrorState> : null}
       {me && !isPlatform ? (
@@ -313,11 +327,11 @@ export default function EventNightsPage() {
         </p>
       ) : null}
 
-      <div className="flex flex-wrap items-end gap-3">
+      <AdminFilterBar>
         <label className="text-sm text-zinc-800 dark:text-zinc-200">
-          <span className="mr-2">Restaurant</span>
+          <span className="mb-0.5 block">Restaurant</span>
           <select
-            className="rounded border border-zinc-200 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
+            className={adminSelectClass + ' min-w-[10rem] text-zinc-900 dark:text-zinc-100'}
             value={restFilter}
             onChange={(e) => setRestFilter(e.target.value)}
           >
@@ -330,9 +344,9 @@ export default function EventNightsPage() {
           </select>
         </label>
         <label className="text-sm text-zinc-800 dark:text-zinc-200">
-          <span className="mr-2">Event status</span>
+          <span className="mb-0.5 block">Event status</span>
           <select
-            className="rounded border border-zinc-200 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
+            className={adminSelectClass + ' min-w-[7rem] text-zinc-900 dark:text-zinc-100'}
             value={statusFilter}
             onChange={(e) =>
               setStatusFilter(e.target.value as typeof statusFilter)
@@ -346,9 +360,9 @@ export default function EventNightsPage() {
           </select>
         </label>
         <label className="text-sm text-zinc-800 dark:text-zinc-200">
-          <span className="mr-2">Listing active</span>
+          <span className="mb-0.5 block">Active</span>
           <select
-            className="rounded border border-zinc-200 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
+            className={adminSelectClass + ' min-w-[5rem] text-zinc-900 dark:text-zinc-100'}
             value={activeFilter}
             onChange={(e) =>
               setActiveFilter(e.target.value as typeof activeFilter)
@@ -360,19 +374,19 @@ export default function EventNightsPage() {
           </select>
         </label>
         <label className="text-sm text-zinc-800 dark:text-zinc-200">
-          <span className="mr-2">Starts from</span>
+          <span className="mb-0.5 block">Starts from</span>
           <input
             type="date"
-            className="rounded border border-zinc-200 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800"
+            className={adminInputClass}
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
           />
         </label>
         <label className="text-sm text-zinc-800 dark:text-zinc-200">
-          <span className="mr-2">Starts to</span>
+          <span className="mb-0.5 block">Starts to</span>
           <input
             type="date"
-            className="rounded border border-zinc-200 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800"
+            className={adminInputClass}
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
           />
@@ -393,9 +407,7 @@ export default function EventNightsPage() {
         <Button type="button" variant="secondary" onClick={load}>
           Refresh
         </Button>
-      </div>
-
-      <p className="text-[11px] text-zinc-500">Client-side paging, default 20 rows.</p>
+      </AdminFilterBar>
 
       {highlightEventId ? (
         <p className="text-xs text-amber-900/90 dark:text-amber-200/80">
@@ -409,30 +421,31 @@ export default function EventNightsPage() {
         </p>
       ) : null}
 
-      <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-700/80 dark:bg-zinc-900/60">
+      <div className={'overflow-hidden ' + adminTableWrap}>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-zinc-100 bg-zinc-50/80 text-xs text-zinc-500 dark:border-zinc-700/80 dark:bg-zinc-800/80 dark:text-zinc-400">
+            <thead className={adminThead}>
               <tr>
                 <th className="px-3 py-2">Title</th>
                 <th className="px-3 py-2">Restaurant</th>
                 <th className="px-3 py-2">Starts / ends</th>
+                <th className="px-3 py-2">Cap. / price</th>
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2">Active</th>
-                <th className="px-3 py-2 min-w-[10rem]">Notes</th>
+                <th className="min-w-[8rem] px-3 py-2">Notes</th>
                 <th className="px-3 py-2">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-700/80">
+            <tbody className="divide-y divide-zinc-200/90 dark:divide-zinc-700/60">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-3 py-4 text-zinc-500">
+                  <td colSpan={8} className="px-3 py-4 text-zinc-500">
                     Loading…
                   </td>
                 </tr>
               ) : paged.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-3 py-4">
+                  <td colSpan={8} className="px-3 py-4">
                     <AdminEmptyState>
                       {filtered.length === 0
                         ? 'No event nights for these filters.'
@@ -464,6 +477,15 @@ export default function EventNightsPage() {
                       <td className="px-3 py-2 text-xs text-zinc-600 dark:text-zinc-400">
                         {fmt(ev.startsAt)} — {fmt(ev.endsAt)}
                       </td>
+                      <td className="px-3 py-2 text-xs text-zinc-700 dark:text-zinc-300">
+                        {ev.capacity != null ? ev.capacity : '—'}
+                        <span className="text-zinc-400"> · </span>
+                        {ev.isFree
+                          ? 'Free'
+                          : ev.price
+                            ? `${ev.price} ${ev.currency || ''}`.trim()
+                            : '—'}
+                      </td>
                       <td className="px-3 py-2">
                         <AdminStatusBadge tone={eventTone(ev.status)}>
                           {ev.status}
@@ -493,7 +515,7 @@ export default function EventNightsPage() {
                             href={`/dashboard/restaurants/${ev.restaurantId}/events`}
                             className="text-xs text-zinc-800 underline dark:text-amber-200/90"
                           >
-                            Venue
+                            View
                           </Link>
                           {isPlatform && ev.status === 'PENDING' ? (
                             <>

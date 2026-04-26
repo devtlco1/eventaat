@@ -101,10 +101,10 @@ export default function DashboardLayout({
           </div>
         </aside>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <header className="flex shrink-0 items-stretch border-b border-zinc-200 bg-white dark:border-zinc-700/80 dark:bg-zinc-900/95 md:pl-0">
-            <div className="flex min-w-0 flex-1 items-center justify-between gap-2 md:justify-end">
-              <details className="group min-w-0 flex-1 border-zinc-200 dark:border-zinc-700/80 md:hidden">
-                <summary className="list-none px-3 py-2 text-sm font-semibold text-zinc-900 after:float-right after:content-['+'] after:text-zinc-500 group-open:after:content-['−'] dark:text-zinc-100 dark:after:text-zinc-500">
+          <header className="flex min-h-12 shrink-0 items-stretch border-b border-zinc-200 bg-white dark:border-zinc-700/80 dark:bg-zinc-900/95">
+            <div className="flex min-w-0 flex-1 items-center">
+              <details className="group min-w-0 border-zinc-200 dark:border-zinc-700/80 md:hidden">
+                <summary className="list-none px-3 py-2.5 text-sm font-semibold text-zinc-900 after:float-right after:content-['+'] after:text-zinc-500 group-open:after:content-['−'] dark:text-zinc-100 dark:after:text-zinc-500">
                   Menu
                 </summary>
                 <div className="mt-0 max-h-[calc(100dvh-8rem)] overflow-y-auto border-b border-zinc-200 dark:border-zinc-700/80">
@@ -117,7 +117,7 @@ export default function DashboardLayout({
                   />
                 </div>
               </details>
-              <div className="shrink-0">
+              <div className="min-w-0 flex-1 md:pl-0">
                 <DashboardHeaderBar />
               </div>
             </div>

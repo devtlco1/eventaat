@@ -20,6 +20,23 @@ async function parseError(res: Response): Promise<ApiError> {
   }
 }
 
+/**
+ * `apiRequest` throws plain `{ status, message }` objects from parseError, not
+ * always `Error`. Use this in catch blocks for user-facing messages.
+ */
+export function getRequestErrorMessage(
+  e: unknown,
+  fallback = 'Request failed',
+): string {
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === 'object' && 'message' in e) {
+    const m = (e as { message: unknown }).message;
+    if (typeof m === 'string') return m;
+    if (Array.isArray(m)) return m.map((x) => String(x)).join(', ');
+  }
+  return fallback;
+}
+
 export async function apiRequest<T>(
   path: string,
   options: RequestInit & { token?: string } = {},

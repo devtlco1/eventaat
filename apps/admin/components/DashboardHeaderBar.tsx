@@ -1,16 +1,17 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   listMyNotifications,
   markNotificationRead,
   type InAppNotification,
 } from '../lib/api';
+import { getDashboardPageTitle } from '../lib/dashboardPageTitle';
 import { getToken } from '../lib/auth';
 import { getNotificationAdminPath } from '../lib/reservationLinks';
 import { IconBell } from './NavIcons';
-import { useRouter } from 'next/navigation';
 
 const POLL_MS = 45_000;
 
@@ -24,6 +25,8 @@ function formatTime(iso: string) {
 
 export function DashboardHeaderBar() {
   const router = useRouter();
+  const pathname = usePathname() ?? '/dashboard';
+  const pageTitle = getDashboardPageTitle(pathname);
   const [unread, setUnread] = useState(0);
   const [items, setItems] = useState<InAppNotification[]>([]);
   const [open, setOpen] = useState(false);
@@ -68,8 +71,17 @@ export function DashboardHeaderBar() {
   }, [open]);
 
   return (
-    <div className="relative flex shrink-0 items-center justify-end bg-white px-3 py-2 dark:bg-zinc-900/95 md:px-4" ref={ref}>
-      <div className="relative">
+    <div
+      className="relative flex w-full min-w-0 items-center justify-between gap-2 py-1.5 pl-2 pr-1 md:py-2 md:pl-0 md:pr-2"
+      ref={ref}
+    >
+      <h1
+        className="min-w-0 flex-1 truncate text-left text-sm font-semibold text-zinc-900 dark:text-zinc-100 md:text-base"
+        title={pageTitle}
+      >
+        {pageTitle}
+      </h1>
+      <div className="relative shrink-0">
         <button
           type="button"
           className="relative flex h-9 w-9 items-center justify-center rounded-md text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"

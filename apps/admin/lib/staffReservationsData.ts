@@ -9,6 +9,43 @@ import {
   type RestaurantReservation,
 } from './api';
 
+function enrichTableRows(
+  rows: RestaurantReservation[],
+  restaurants: Restaurant[],
+): RestaurantReservation[] {
+  const byId = new Map(restaurants.map((r) => [r.id, r]));
+  return rows.map((row) => {
+    if (row.restaurant?.name) return row;
+    const r = byId.get(row.restaurantId);
+    if (!r) return row;
+    return {
+      ...row,
+      restaurant: {
+        id: r.id,
+        name: r.name,
+        city: r.city,
+        area: r.area,
+      },
+    };
+  });
+}
+
+function enrichEventResRows(
+  rows: AdminEventReservation[],
+  restaurants: Restaurant[],
+): AdminEventReservation[] {
+  const byId = new Map(restaurants.map((r) => [r.id, r]));
+  return rows.map((row) => {
+    if (row.restaurant?.name) return row;
+    const r = byId.get(row.restaurantId);
+    if (!r) return row;
+    return {
+      ...row,
+      restaurant: { id: r.id, name: r.name, city: r.city, area: r.area },
+    };
+  });
+}
+
 export async function loadAllAccessibleTableReservations(
   token: string,
 ): Promise<{
@@ -31,7 +68,7 @@ export async function loadAllAccessibleTableReservations(
       new Date(b.requestedAt || b.startAt).getTime() -
       new Date(a.requestedAt || a.startAt).getTime(),
   );
-  return { restaurants, rows };
+  return { restaurants, rows: enrichTableRows(rows, restaurants) };
 }
 
 export async function loadAllAccessibleEventReservations(
@@ -55,7 +92,7 @@ export async function loadAllAccessibleEventReservations(
     (a, b) =>
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
-  return { restaurants, rows };
+  return { restaurants, rows: enrichEventResRows(rows, restaurants) };
 }
 
 export async function loadAllAccessibleEventNights(

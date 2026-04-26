@@ -7,8 +7,10 @@ import { Button } from '../../../components/Button';
 import { Input } from '../../../components/Input';
 import { getToken } from '../../../lib/auth';
 import { useClientPagination } from '../../../lib/useClientPagination';
+import { adminThead } from '../../../components/admin/adminShellClasses';
 import {
   getMe,
+  getRequestErrorMessage,
   listUsers,
   updateUser,
   type MeResponse,
@@ -104,11 +106,9 @@ export default function UsersPage() {
             setError('You do not have permission to view users.');
           }
         } else {
-          const message =
-            typeof err === 'object' && err && 'message' in err
-              ? String((err as any).message)
-              : 'Failed to load users';
-          if (!cancelled) setError(message);
+          if (!cancelled) {
+            setError(getRequestErrorMessage(err, 'Failed to load users'));
+          }
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -177,11 +177,7 @@ export default function UsersPage() {
       if (status === 403) {
         setError('Only PLATFORM_ADMIN can update users.');
       } else {
-        const message =
-          typeof err === 'object' && err && 'message' in err
-            ? String((err as any).message)
-            : 'Failed to update user';
-        setError(message);
+        setError(getRequestErrorMessage(err, 'Failed to update user'));
       }
     } finally {
       setSubmitting(false);
@@ -369,8 +365,8 @@ export default function UsersPage() {
       ) : null}
 
       {isPlatformAdmin ? (
-      <div className="rounded-xl border border-zinc-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between gap-4 border-b border-zinc-200 px-6 py-4 dark:border-zinc-700/80">
+      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/40">
+        <div className="flex items-center justify-between gap-4 border-b border-zinc-200 px-6 py-4 dark:border-zinc-700/60">
           <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
             User list
           </div>
@@ -383,7 +379,7 @@ export default function UsersPage() {
 
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500 dark:bg-zinc-800/80 dark:text-zinc-400">
+            <thead className={adminThead}>
               <tr>
                 <th className="px-6 py-3">Full name</th>
                 <th className="px-6 py-3">Email</th>
@@ -394,7 +390,7 @@ export default function UsersPage() {
                 <th className="px-6 py-3">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-700/80">
+            <tbody className="divide-y divide-zinc-200/90 dark:divide-zinc-700/60">
               {loading ? (
                 <tr>
                   <td className="px-6 py-4 text-zinc-600 dark:text-zinc-400" colSpan={7}>
@@ -437,12 +433,13 @@ export default function UsersPage() {
                     </td>
                     <td className="px-6 py-4">
                       {isPlatformAdmin ? (
-                        <Button
-                          variant="secondary"
+                        <button
+                          type="button"
+                          className="text-sm font-medium text-amber-800 underline hover:text-amber-900 dark:text-amber-300/90"
                           onClick={() => setEditingId(u.id)}
                         >
                           Edit
-                        </Button>
+                        </button>
                       ) : (
                         <span className="text-zinc-500">—</span>
                       )}

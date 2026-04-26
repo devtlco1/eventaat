@@ -13,6 +13,7 @@ import {
   IconPanelLeftClose,
   IconClipboardList,
   IconBell,
+  IconLogOut,
 } from './NavIcons';
 import { SideNavLink } from './SideNavLink';
 import type { MeResponse } from '../lib/api';
@@ -88,20 +89,21 @@ function AccountBlock({ onLogout, collapsed }: { onLogout: () => void; collapsed
       <div className="mt-1 flex flex-col items-center gap-1.5 border-t border-zinc-200/90 pt-2.5 dark:border-zinc-600/60">
         <SideNavLink
           href="/dashboard/account"
-          label="Profile / Account"
+          label="Account"
           match="prefix"
           icon={<IconUserCircle className="h-4 w-4" />}
           collapsed
         />
         <AdminThemeToggle collapsed />
         <Button
-          className="!h-9 !w-9 !p-0 !text-[10px] font-medium"
+          className="!h-9 !w-9 !p-0"
           type="button"
           variant="secondary"
-          title="Logout"
+          title="Log out"
           onClick={onLogout}
         >
-          ⇤
+          <span className="sr-only">Log out</span>
+          <IconLogOut className="h-4 w-4" />
         </Button>
       </div>
     );
@@ -110,7 +112,7 @@ function AccountBlock({ onLogout, collapsed }: { onLogout: () => void; collapsed
     <div className="mt-1 space-y-1.5 border-t border-zinc-200/90 pt-2.5 dark:border-zinc-600/60">
       <SideNavLink
         href="/dashboard/account"
-        label="Profile / Account"
+        label="Account"
         match="prefix"
         icon={<IconUserCircle className="h-4 w-4" />}
       />
