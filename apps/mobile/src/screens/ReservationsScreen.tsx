@@ -1,3 +1,5 @@
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -24,6 +26,7 @@ import type {
   GuestType,
   MyEventReservation,
   MyReservation,
+  MyTableReservation,
   ReservationStatus,
   SeatingPreference,
 } from '../lib/types';
@@ -125,8 +128,9 @@ function placeSubtitleEvent(r: MyEventReservation): string {
 }
 
 export function ReservationsScreen(_props: Props) {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { token, signOut } = useAuth();
-  const [reservations, setReservations] = useState<MyReservation[]>([]);
+  const [reservations, setReservations] = useState<MyTableReservation[]>([]);
   const [eventReservations, setEventReservations] = useState<MyEventReservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -278,11 +282,13 @@ export function ReservationsScreen(_props: Props) {
         const key = `ev:${r.id}`;
         const busyThis = cancellingId === key;
         return (
-          <View
-            key={r.id}
-            style={styles.card}
-            accessibilityLabel={`Event reservation ${badge.display}`}
-          >
+          <View key={r.id} style={styles.card}>
+            <Pressable
+              accessibilityLabel={`Event reservation ${badge.display}`}
+              onPress={() =>
+                navigation.navigate('ReservationDetail', { kind: 'EVENT', id: r.id })
+              }
+            >
             <View style={styles.typeTag}>
               <Text style={styles.typeTagText}>EVENT</Text>
             </View>
@@ -328,6 +334,10 @@ export function ReservationsScreen(_props: Props) {
                 {r.statusHistory.map((h) => {
                   const line = `${h.fromStatus ?? '—'} → ${h.toStatus}${
                     h.note ? ` · ${h.note}` : ''
+                  }${
+                    h.changedBy
+                      ? ` · ${h.changedBy.fullName || h.changedBy.email}`
+                      : ''
                   }`;
                   return (
                     <Text key={h.id} style={styles.historyLine}>
@@ -337,6 +347,8 @@ export function ReservationsScreen(_props: Props) {
                 })}
               </View>
             ) : null}
+            <Text style={styles.tapHint}>Tap for full detail</Text>
+            </Pressable>
             {mayCancel ? (
               <Pressable
                 style={[styles.cancelBtn, busyThis && styles.btnDisabled]}
@@ -387,7 +399,13 @@ export function ReservationsScreen(_props: Props) {
         const mayCancel = STATUS_CUSTOMER_MAY_CANCEL.has(st) && beforeStart;
         const busyThis = cancellingId === r.id;
         return (
-          <View key={r.id} style={styles.card} accessibilityLabel={`Table reservation ${badge.display}`}>
+          <View key={r.id} style={styles.card}>
+            <Pressable
+              accessibilityLabel={`Table reservation ${badge.display}`}
+              onPress={() =>
+                navigation.navigate('ReservationDetail', { kind: 'TABLE', id: r.id })
+              }
+            >
             <View style={styles.typeTagNeutral}>
               <Text style={styles.typeTagTextNeutral}>TABLE</Text>
             </View>
@@ -423,18 +441,24 @@ export function ReservationsScreen(_props: Props) {
             {r.statusHistory && r.statusHistory.length > 0 ? (
               <View style={styles.historyBlock}>
                 <Text style={styles.historyLabel}>Status updates</Text>
-                {r.statusHistory.map((h, i) => {
+                {r.statusHistory.map((h) => {
                   const line = `${h.fromStatus ?? '—'} → ${h.toStatus}${
                     h.note ? ` · ${h.note}` : ''
+                  }${
+                    h.changedBy
+                      ? ` · ${h.changedBy.fullName || h.changedBy.email}`
+                      : ''
                   }`;
                   return (
-                    <Text key={`${h.createdAt}-${i}`} style={styles.historyLine}>
+                    <Text key={h.id} style={styles.historyLine}>
                       {formatHistoryWhen(h.createdAt)} — {line}
                     </Text>
                   );
                 })}
               </View>
             ) : null}
+            <Text style={styles.tapHint}>Tap for full detail</Text>
+            </Pressable>
             {mayCancel ? (
               <Pressable
                 style={[styles.cancelBtn, busyThis && styles.btnDisabled]}
@@ -578,6 +602,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   historyLine: { fontSize: 13, color: '#64748b', lineHeight: 20, marginTop: 2 },
+  tapHint: { fontSize: 12, color: '#94a3b8', marginTop: 8, fontStyle: 'italic' },
   noteBlock: { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
   note: { marginTop: 4, fontSize: 15, color: '#334155', lineHeight: 22 },
   badge: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, alignSelf: 'flex-start' },

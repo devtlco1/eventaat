@@ -25,6 +25,15 @@ export class MeController {
     return this.eventReservations.listMyEventReservations(user);
   }
 
+  @Get('event-reservations/:eventReservationId')
+  @Roles('CUSTOMER')
+  getMyEventReservation(
+    @Param('eventReservationId', new ParseUUIDPipe()) eventReservationId: string,
+    @CurrentUser() user: SafeUser,
+  ) {
+    return this.eventReservations.getMyEventReservation(eventReservationId, user);
+  }
+
   @Patch('event-reservations/:eventReservationId/cancel')
   @Roles('CUSTOMER')
   cancelMyEventReservation(
@@ -43,6 +52,15 @@ export class MeController {
   @Roles('CUSTOMER')
   listMyReservations(@CurrentUser() user: SafeUser) {
     return this.restaurants.listMyReservations(user);
+  }
+
+  @Get('reservations/:reservationId')
+  @Roles('CUSTOMER')
+  getMyTableReservation(
+    @Param('reservationId', new ParseUUIDPipe()) reservationId: string,
+    @CurrentUser() user: SafeUser,
+  ) {
+    return this.restaurants.getMyTableReservation(reservationId, user);
   }
 
   @Patch('reservations/:reservationId/cancel')

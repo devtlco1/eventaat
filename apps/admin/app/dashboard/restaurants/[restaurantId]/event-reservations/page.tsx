@@ -223,6 +223,7 @@ export default function RestaurantEventReservationsPage() {
           <table className="min-w-full text-left text-sm">
             <thead className="bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500">
               <tr>
+                <th className="px-6 py-3">Type</th>
                 <th className="px-6 py-3">Customer</th>
                 <th className="px-6 py-3">Event</th>
                 <th className="px-6 py-3">When</th>
@@ -235,13 +236,13 @@ export default function RestaurantEventReservationsPage() {
             <tbody className="divide-y divide-zinc-200">
               {loading ? (
                 <tr>
-                  <td className="px-6 py-4 text-zinc-600" colSpan={7}>
+                  <td className="px-6 py-4 text-zinc-600" colSpan={8}>
                     Loading event reservations…
                   </td>
                 </tr>
               ) : list.length === 0 ? (
                 <tr>
-                  <td className="px-6 py-4 text-zinc-600" colSpan={7}>
+                  <td className="px-6 py-4 text-zinc-600" colSpan={8}>
                     No event reservation requests.
                   </td>
                 </tr>
@@ -251,10 +252,18 @@ export default function RestaurantEventReservationsPage() {
                   const terminal = row.status === 'REJECTED' || row.status === 'CANCELLED';
                   const canAct = canManage && !busy && !terminal;
                   const isRejecting = rejectingId === row.id;
+                  const typeLabel = row.type ?? 'EVENT';
+                  const priceLine =
+                    row.event.isFree || row.event.price == null
+                      ? 'Free'
+                      : `${row.event.price} ${row.event.currency}`.trim();
 
                   return (
                     <Fragment key={row.id}>
                       <tr className="hover:bg-zinc-50/50">
+                        <td className="px-6 py-4 align-top text-xs font-semibold text-zinc-800">
+                          {typeLabel}
+                        </td>
                         <td className="px-6 py-4">
                           <div className="font-medium text-zinc-900">{row.customer.email}</div>
                           {row.customer.fullName ? (
@@ -264,9 +273,15 @@ export default function RestaurantEventReservationsPage() {
                             <div className="text-xs text-zinc-500">{row.customer.phone}</div>
                           ) : null}
                         </td>
-                        <td className="max-w-[12rem] px-6 py-4 text-zinc-800">{row.event.title}</td>
+                        <td className="max-w-[12rem] px-6 py-4 text-zinc-800">
+                          <div className="font-medium">{row.event.title}</div>
+                          <div className="text-xs text-zinc-500">{priceLine}</div>
+                        </td>
                         <td className="px-6 py-4 text-zinc-700">
                           <div className="whitespace-nowrap">{fmt(row.event.startsAt)}</div>
+                          {row.restaurant ? (
+                            <div className="text-xs text-zinc-500">{row.restaurant.name}</div>
+                          ) : null}
                         </td>
                         <td className="px-6 py-4 text-zinc-700">{row.partySize}</td>
                         <td className="px-6 py-4">
@@ -279,11 +294,22 @@ export default function RestaurantEventReservationsPage() {
                               {row.rejectionReason}
                             </div>
                           ) : null}
+                          {row.cancellationReason && row.status === 'CANCELLED' ? (
+                            <div
+                              className="mt-1 max-w-xs text-xs text-zinc-600"
+                              title={row.cancellationReason}
+                            >
+                              Cancel: {row.cancellationReason}
+                            </div>
+                          ) : null}
                         </td>
                         <td className="max-w-[14rem] px-6 py-4 text-xs text-zinc-700">
-                          {row.specialRequest ? (
-                            <div className="line-clamp-2" title={row.specialRequest}>
-                              {row.specialRequest}
+                          {row.note || row.specialRequest ? (
+                            <div
+                              className="line-clamp-2"
+                              title={row.note || row.specialRequest || ''}
+                            >
+                              {row.note || row.specialRequest}
                             </div>
                           ) : (
                             <span className="text-zinc-400">—</span>
@@ -350,7 +376,7 @@ export default function RestaurantEventReservationsPage() {
                       </tr>
                       {row.statusHistory && row.statusHistory.length > 0 ? (
                         <tr className="bg-zinc-50/40">
-                          <td colSpan={7} className="px-6 py-2">
+                          <td colSpan={8} className="px-6 py-2">
                             <details>
                               <summary className="cursor-pointer text-xs font-medium text-zinc-600">
                                 Status history ({row.statusHistory.length})

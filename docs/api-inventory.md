@@ -4,7 +4,7 @@
 **OpenAPI JSON:** [http://localhost:4000/docs-json](http://localhost:4000/docs-json) (with API running)  
 **Handwritten reference (detail):** [api-reference.md](api-reference.md)
 
-| Total endpoints | 47 |
+| Total endpoints | 51 |
 |-----------------|----|
 
 ## Count by module (domain)
@@ -14,8 +14,8 @@
 | `health` | 1 | Liveness and DB check |
 | `auth` | 4 | Register, login, session, admin smoke test |
 | `users` | 3 | Platform user directory and updates |
-| `me` | 4 | Customer: own table and event reservation lists and cancellations |
-| `restaurants` | 35 | Restaurants CRUD, ops, events, both reservation types, tables, assignments |
+| `me` | 6 | Customer: own table and event reservation lists, detail GETs, and cancellations |
+| `restaurants` | 37 | Restaurants CRUD, ops, events, both reservation types, tables, assignments |
 
 The `restaurants` controller (single Nest `@Controller('restaurants')`) is split below by domain for clarity. Paths still live under `/restaurants/...`.
 
@@ -25,11 +25,11 @@ The `restaurants` controller (single Nest `@Controller('restaurants')`) is split
 | Availability, operating & opening hours, profile | 7 |
 | Contacts | 4 |
 | Event nights (events) | 6 |
-| Event reservations | 3 |
+| Event reservations | 4 |
 | Admin assignments | 3 |
 | Tables | 4 |
-| Table reservations | 4 |
-| *Subtotal* | *35* |
+| Table reservations | 5 |
+| *Subtotal* | *37* |
 
 ---
 
@@ -47,9 +47,11 @@ All paths are relative to the base URL. Unless noted, JSON request bodies follow
 | GET | `/users` | users | Bearer | PLATFORM_ADMIN | implemented | Optional query: `role`, `isActive` |
 | GET | `/users/:id` | users | Bearer | PLATFORM_ADMIN | implemented | 404: unknown user |
 | PATCH | `/users/:id` | users | Bearer | PLATFORM_ADMIN | implemented | Partial user update |
-| GET | `/me/event-reservations` | me | Bearer | CUSTOMER | implemented | List caller’s event reservations |
+| GET | `/me/event-reservations` | me | Bearer | CUSTOMER | implemented | List caller’s event reservations (normalized `type: EVENT`, `statusHistory` oldest→newest) |
+| GET | `/me/event-reservations/:eventReservationId` | me | Bearer | CUSTOMER | implemented | Single event reservation; 404 if not found / not owner |
 | PATCH | `/me/event-reservations/:eventReservationId/cancel` | me | Bearer | CUSTOMER | implemented | Optional body `{ "note"?: string }` |
-| GET | `/me/reservations` | me | Bearer | CUSTOMER | implemented | List caller’s table reservations |
+| GET | `/me/reservations` | me | Bearer | CUSTOMER | implemented | List caller’s table reservations (normalized `type: TABLE`, `statusHistory` oldest→newest) |
+| GET | `/me/reservations/:reservationId` | me | Bearer | CUSTOMER | implemented | Single table reservation; 404 if not found / not owner |
 | PATCH | `/me/reservations/:reservationId/cancel` | me | Bearer | CUSTOMER | implemented | Optional body `{ "note"?: string }` |
 | POST | `/restaurants` | restaurants (core) | Bearer | PLATFORM_ADMIN | implemented | Create restaurant |
 | GET | `/restaurants` | restaurants (core) | Bearer | any | implemented | Admins may see inactive |
@@ -74,6 +76,7 @@ All paths are relative to the base URL. Unless noted, JSON request bodies follow
 | DELETE | `/restaurants/:restaurantId/events/:eventId` | event nights | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | Soft deactivate (204) |
 | POST | `/restaurants/:restaurantId/events/:eventId/reservations` | event reservations | Bearer | CUSTOMER | implemented | Body: `partySize`, optional `specialRequest` — **not** a table booking |
 | GET | `/restaurants/:restaurantId/event-reservations` | event reservations | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | Query: `eventId?` (optional) |
+| GET | `/restaurants/:restaurantId/event-reservations/:eventReservationId` | event reservations | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | Single row for restaurant; assignment applies |
 | PATCH | `/restaurants/:restaurantId/event-reservations/:eventReservationId/status` | event reservations | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | `CONFIRMED` / `REJECTED`; capacity on confirm |
 | POST | `/restaurants/:id/admins` | admin assignments | Bearer | PLATFORM_ADMIN | implemented | Body: `{ "userId" }` |
 | GET | `/restaurants/:id/admins` | admin assignments | Bearer | PLATFORM_ADMIN | implemented | |
@@ -83,8 +86,9 @@ All paths are relative to the base URL. Unless noted, JSON request bodies follow
 | GET | `/restaurants/:restaurantId/tables/:tableId` | tables | Bearer | any | implemented | Customer: inactive table → 404 |
 | PATCH | `/restaurants/:restaurantId/tables/:tableId` | tables | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | |
 | POST | `/restaurants/:restaurantId/reservations` | table reservations | Bearer | CUSTOMER | implemented | **Table** booking request (optional `tableId`) |
-| GET | `/restaurants/:restaurantId/reservations` | table reservations | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | R-A: assigned only |
-| GET | `/restaurants/:restaurantId/reservations/:reservationId/history` | table reservations | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | |
+| GET | `/restaurants/:restaurantId/reservations` | table reservations | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | R-A: assigned only; responses include `type: TABLE`, `statusHistory` |
+| GET | `/restaurants/:restaurantId/reservations/:reservationId` | table reservations | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | Full detail; same shape as list item |
+| GET | `/restaurants/:restaurantId/reservations/:reservationId/history` | table reservations | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | Table status history only (list/detail also embed the same) |
 | PATCH | `/restaurants/:restaurantId/reservations/:reservationId/status` | table reservations | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | Transitions + optional `note` |
 
 *No endpoints are currently marked **deprecated** or **planned** in this inventory; future routes should be added here in the same commit as code changes (see [README.md](../README.md#api-documentation)).*

@@ -4,7 +4,7 @@ import type {
   CreateReservationRequestBody,
   MyEventReservation,
   MyReservation,
-  ReservationRecord,
+  MyTableReservation,
   Restaurant,
   RestaurantContact,
   RestaurantDetail,
@@ -243,7 +243,7 @@ export async function createReservationRequest(
   accessToken: string,
   restaurantId: string,
   body: CreateReservationRequestBody,
-): Promise<ReservationRecord> {
+): Promise<MyTableReservation> {
   const res = await fetch(`${baseUrl()}/restaurants/${restaurantId}/reservations`, {
     method: 'POST',
     headers: { ...authHeaders(accessToken), 'Content-Type': 'application/json' },
@@ -259,7 +259,7 @@ export async function createReservationRequest(
     );
     throw new Error(message);
   }
-  return res.json() as Promise<ReservationRecord>;
+  return res.json() as Promise<MyTableReservation>;
 }
 
 export type CancelMyReservationBody = { note?: string };
@@ -288,6 +288,48 @@ export async function cancelMyReservation(
     throw new Error(message);
   }
   return res.json() as Promise<MyReservation>;
+}
+
+export async function fetchMyTableReservation(
+  accessToken: string,
+  reservationId: string,
+): Promise<MyTableReservation> {
+  const res = await fetch(
+    `${baseUrl()}/me/reservations/${encodeURIComponent(reservationId)}`,
+    { method: 'GET', headers: authHeaders(accessToken) },
+  );
+  if (res.status === 401) {
+    throw new Error('Unauthorized (401) — sign in again.');
+  }
+  if (!res.ok) {
+    const message = await readErrorMessage(
+      res,
+      `Could not load reservation (${res.status})`,
+    );
+    throw new Error(message);
+  }
+  return res.json() as Promise<MyTableReservation>;
+}
+
+export async function fetchMyEventReservation(
+  accessToken: string,
+  eventReservationId: string,
+): Promise<MyEventReservation> {
+  const res = await fetch(
+    `${baseUrl()}/me/event-reservations/${encodeURIComponent(eventReservationId)}`,
+    { method: 'GET', headers: authHeaders(accessToken) },
+  );
+  if (res.status === 401) {
+    throw new Error('Unauthorized (401) — sign in again.');
+  }
+  if (!res.ok) {
+    const message = await readErrorMessage(
+      res,
+      `Could not load event reservation (${res.status})`,
+    );
+    throw new Error(message);
+  }
+  return res.json() as Promise<MyEventReservation>;
 }
 
 export async function fetchMyReservations(

@@ -10,7 +10,6 @@ import {
   Prisma,
   Restaurant,
   RestaurantAdmin,
-  Reservation,
   ReservationStatus,
   RestaurantContact,
   RestaurantContactType,
@@ -46,11 +45,39 @@ import {
   localCalendarDaysBetween,
   startOfLocalDay,
 } from './operating-time.util';
-import type {
-  AdminReservationView,
-  AdminStatusHistoryEntry,
-  CustomerReservationListItem,
-} from './reservation-views';
+import type { CustomerTableReservationResponse } from './reservation-response.mappers';
+import {
+  mapTableHistoryList,
+  toAdminTableReservationView,
+  toCustomerTableReservationView,
+} from './reservation-response.mappers';
+import type { AdminTableReservationResponse } from './reservation-response.mappers';
+import type { PublicTableStatusHistoryItem } from './reservation-response.mappers';
+/** Customer-facing table reservation detail (incl. status history with actor). */
+const tableReservationDetailForCustomer: Prisma.ReservationInclude = {
+  restaurant: { select: { id: true, name: true, city: true, area: true } },
+  table: { select: { id: true, name: true, capacity: true } },
+  statusHistory: {
+    orderBy: { createdAt: 'asc' },
+    include: {
+      changedBy: { select: { id: true, fullName: true, email: true } },
+    },
+  },
+};
+
+const tableReservationDetailForAdmin: Prisma.ReservationInclude = {
+  customer: {
+    select: { id: true, email: true, fullName: true, phone: true },
+  },
+  restaurant: { select: { id: true, name: true, city: true, area: true } },
+  table: { select: { id: true, name: true, capacity: true } },
+  statusHistory: {
+    orderBy: { createdAt: 'asc' },
+    include: {
+      changedBy: { select: { id: true, fullName: true, email: true } },
+    },
+  },
+};
 
 @Injectable()
 export class RestaurantsService {
@@ -911,7 +938,7 @@ export class RestaurantsService {
     restaurantId: string,
     dto: CreateReservationDto,
     customer: SafeUser,
-  ): Promise<Reservation> {
+  ): Promise<CustomerTableReservationResponse> {
     // CUSTOMER-only endpoint, but keep defensive.
     if (customer.role !== Role.CUSTOMER) {
       throw new ForbiddenException('Only customers can create reservations');
@@ -1015,60 +1042,76 @@ export class RestaurantsService {
           note: 'Reservation request submitted',
         },
       });
-      return created;
-    });
+      return tx.reservation.findFirstOrThrow({
+        where: { id: created.id },
+        include: tableReservationDetailForCustomer,
+      } as any);
+    }).then((row) => toCustomerTableReservationView(row as any));
+  }
+
+  /**
+   * Customer: single table reservation (same shape as list items). 404 if not found or not owner.
+   */
+  async getMyTableReservation(
+    reservationId: string,
+    customer: SafeUser,
+  ): Promise<CustomerTableReservationResponse> {
+    if (customer.role !== Role.CUSTOMER) {
+      throw new ForbiddenException();
+    }
+    const row = await this.prisma.reservation.findFirst({
+      where: { id: reservationId, customerId: customer.id },
+      include: tableReservationDetailForCustomer,
+    } as any);
+    if (!row) {
+      throw new NotFoundException('Reservation not found');
+    }
+    return toCustomerTableReservationView(row as any);
+  }
+
+  /**
+   * Admin: single table reservation for a restaurant. 404 if not found / wrong restaurant.
+   */
+  async getRestaurantTableReservation(
+    restaurantId: string,
+    reservationId: string,
+    viewer: SafeUser,
+  ): Promise<AdminTableReservationResponse> {
+    await this.assertRestaurantExists(restaurantId);
+    await this.assertCanManageRestaurant(viewer, restaurantId);
+    const row = await this.prisma.reservation.findFirst({
+      where: { id: reservationId, restaurantId },
+      include: tableReservationDetailForAdmin,
+    } as any);
+    if (!row) {
+      throw new NotFoundException('Reservation not found');
+    }
+    return toAdminTableReservationView(row as any);
   }
 
   async listMyReservations(
     customer: SafeUser,
-  ): Promise<CustomerReservationListItem[]> {
+  ): Promise<CustomerTableReservationResponse[]> {
     if (customer.role !== Role.CUSTOMER) {
       throw new ForbiddenException('Only customers can view this endpoint');
     }
 
-    // `as any` avoids Prisma+TS pathological type inference on nested includes
-    // (tsc can hang for minutes). Shape is covered by `CustomerReservationListItem`.
-    return (await this.prisma.reservation.findMany({
+    const rows = await this.prisma.reservation.findMany({
       where: { customerId: customer.id },
       orderBy: { startAt: 'desc' },
-      include: {
-        restaurant: { select: { id: true, name: true, city: true, area: true } },
-        table: { select: { id: true, name: true, capacity: true } },
-        statusHistory: {
-          orderBy: { createdAt: 'asc' },
-          select: {
-            fromStatus: true,
-            toStatus: true,
-            note: true,
-            createdAt: true,
-          },
-        },
-      },
-    } as any)) as CustomerReservationListItem[];
+      include: tableReservationDetailForCustomer,
+    } as any);
+    return (rows as any[]).map((r) => toCustomerTableReservationView(r));
   }
 
   async cancelMyReservation(
     reservationId: string,
     customer: SafeUser,
     dto: CancelMyReservationDto,
-  ): Promise<CustomerReservationListItem> {
+  ): Promise<CustomerTableReservationResponse> {
     if (customer.role !== Role.CUSTOMER) {
       throw new ForbiddenException('Only customers can cancel via this endpoint');
     }
-
-    const myReservationInclude = {
-      restaurant: { select: { id: true, name: true, city: true, area: true } },
-      table: { select: { id: true, name: true, capacity: true } },
-      statusHistory: {
-        orderBy: { createdAt: 'asc' } as const,
-        select: {
-          fromStatus: true,
-          toStatus: true,
-          note: true,
-          createdAt: true,
-        },
-      },
-    };
 
     return this.prisma.$transaction(async (tx) => {
       const row = await tx.reservation.findFirst({
@@ -1123,48 +1166,33 @@ export class RestaurantsService {
         data: { status: ReservationStatus.CANCELLED },
       });
 
-      return (await tx.reservation.findFirstOrThrow({
+      return tx.reservation.findFirstOrThrow({
         where: { id: row.id },
-        include: myReservationInclude,
-      } as any)) as CustomerReservationListItem;
-    });
+        include: tableReservationDetailForCustomer,
+      } as any);
+    }).then((r) => toCustomerTableReservationView(r as any));
   }
 
   async listRestaurantReservations(
     restaurantId: string,
     viewer: SafeUser,
-  ): Promise<AdminReservationView[]> {
+  ): Promise<AdminTableReservationResponse[]> {
     await this.assertRestaurantExists(restaurantId);
     await this.assertCanManageRestaurant(viewer, restaurantId);
 
-    return (await this.prisma.reservation.findMany({
+    const rows = (await this.prisma.reservation.findMany({
       where: { restaurantId },
-      include: {
-        customer: {
-          select: {
-            id: true,
-            email: true,
-            fullName: true,
-            phone: true,
-          },
-        },
-        table: { select: { id: true, name: true, capacity: true } },
-        statusHistory: {
-          orderBy: { createdAt: 'asc' },
-          include: {
-            changedBy: { select: { id: true, fullName: true, email: true } },
-          },
-        },
-      },
+      include: tableReservationDetailForAdmin,
       orderBy: { startAt: 'desc' },
-    } as any)) as AdminReservationView[];
+    } as any)) as any[];
+    return rows.map((r) => toAdminTableReservationView(r));
   }
 
   async getReservationStatusHistory(
     restaurantId: string,
     reservationId: string,
     viewer: SafeUser,
-  ) {
+  ): Promise<PublicTableStatusHistoryItem[]> {
     await this.assertRestaurantExists(restaurantId);
     await this.assertCanManageRestaurant(viewer, restaurantId);
 
@@ -1176,13 +1204,14 @@ export class RestaurantsService {
       throw new NotFoundException('Reservation not found');
     }
 
-    return (await this.prisma.reservationStatusHistory.findMany({
+    const rows = await this.prisma.reservationStatusHistory.findMany({
       where: { reservationId },
       orderBy: { createdAt: 'asc' },
       include: {
         changedBy: { select: { id: true, fullName: true, email: true } },
       },
-    } as any)) as AdminStatusHistoryEntry[];
+    } as any);
+    return mapTableHistoryList(rows as any);
   }
 
   async updateReservationStatus(
@@ -1190,7 +1219,7 @@ export class RestaurantsService {
     reservationId: string,
     dto: UpdateReservationStatusDto,
     actor: SafeUser,
-  ): Promise<AdminReservationView> {
+  ): Promise<AdminTableReservationResponse> {
     await this.assertRestaurantExists(restaurantId);
     await this.assertCanManageRestaurant(actor, restaurantId);
 
@@ -1229,23 +1258,12 @@ export class RestaurantsService {
         },
       });
 
-      return (await tx.reservation.update({
+      return tx.reservation.update({
         where: { id: reservationId },
         data: { status: dto.status },
-        include: {
-          customer: {
-            select: { id: true, email: true, fullName: true, phone: true },
-          },
-          table: { select: { id: true, name: true, capacity: true } },
-          statusHistory: {
-            orderBy: { createdAt: 'asc' },
-            include: {
-              changedBy: { select: { id: true, fullName: true, email: true } },
-            },
-          },
-        },
-      } as any)) as AdminReservationView;
-    });
+        include: tableReservationDetailForAdmin,
+      } as any);
+    }).then((r) => toAdminTableReservationView(r as any));
   }
 
   // ─── Availability ─────────────────────────────────────────────────────────

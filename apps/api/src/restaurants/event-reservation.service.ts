@@ -16,6 +16,46 @@ import { SafeUser } from '../users/users.service';
 import { CreateEventReservationDto } from './dto/create-event-reservation.dto';
 import { UpdateEventReservationStatusDto } from './dto/update-event-reservation-status.dto';
 import { CancelMyReservationDto } from './dto/cancel-my-reservation.dto';
+import type { CustomerEventReservationResponse } from './reservation-response.mappers';
+import {
+  toAdminEventReservationView,
+  toCustomerEventReservationView,
+} from './reservation-response.mappers';
+import type { AdminEventReservationResponse } from './reservation-response.mappers';
+
+const eventForReservationDetail = {
+  id: true,
+  title: true,
+  startsAt: true,
+  endsAt: true,
+  capacity: true,
+  isFree: true,
+  price: true,
+  currency: true,
+} as const;
+
+const eventReservationDetailForCustomer: Prisma.EventReservationInclude = {
+  restaurant: { select: { id: true, name: true, city: true, area: true } },
+  event: { select: { ...eventForReservationDetail } },
+  statusHistory: {
+    orderBy: { createdAt: 'asc' },
+    include: {
+      changedBy: { select: { id: true, fullName: true, email: true } },
+    },
+  },
+};
+
+const eventReservationDetailForAdmin: Prisma.EventReservationInclude = {
+  customer: { select: { id: true, email: true, fullName: true, phone: true } },
+  restaurant: { select: { id: true, name: true, city: true, area: true } },
+  event: { select: { ...eventForReservationDetail } },
+  statusHistory: {
+    orderBy: { createdAt: 'asc' },
+    include: {
+      changedBy: { select: { id: true, fullName: true, email: true } },
+    },
+  },
+};
 
 @Injectable()
 export class EventReservationService {
@@ -107,7 +147,7 @@ export class EventReservationService {
     eventId: string,
     dto: CreateEventReservationDto,
     customer: SafeUser,
-  ) {
+  ): Promise<CustomerEventReservationResponse> {
     if (customer.role !== Role.CUSTOMER) {
       throw new ForbiddenException('Only customers can create event reservations');
     }
@@ -162,69 +202,47 @@ export class EventReservationService {
       });
       return tx.eventReservation.findFirstOrThrow({
         where: { id: created.id },
-        include: {
-          restaurant: { select: { id: true, name: true, city: true, area: true } },
-          event: {
-            select: {
-              id: true,
-              title: true,
-              startsAt: true,
-              endsAt: true,
-              capacity: true,
-            },
-          },
-          statusHistory: {
-            orderBy: { createdAt: 'asc' },
-            select: {
-              id: true,
-              fromStatus: true,
-              toStatus: true,
-              note: true,
-              createdAt: true,
-            },
-          },
-        },
-      });
-    });
+        include: eventReservationDetailForCustomer,
+      } as any);
+    }).then((row) => toCustomerEventReservationView(row as any));
   }
 
-  async listMyEventReservations(customer: SafeUser) {
+  async getMyEventReservation(
+    eventReservationId: string,
+    customer: SafeUser,
+  ): Promise<CustomerEventReservationResponse> {
+    if (customer.role !== Role.CUSTOMER) {
+      throw new ForbiddenException();
+    }
+    const row = await this.prisma.eventReservation.findFirst({
+      where: { id: eventReservationId, customerId: customer.id },
+      include: eventReservationDetailForCustomer,
+    } as any);
+    if (!row) {
+      throw new NotFoundException('Event reservation not found');
+    }
+    return toCustomerEventReservationView(row as any);
+  }
+
+  async listMyEventReservations(
+    customer: SafeUser,
+  ): Promise<CustomerEventReservationResponse[]> {
     if (customer.role !== Role.CUSTOMER) {
       throw new ForbiddenException('Only customers can view this list');
     }
-    return this.prisma.eventReservation.findMany({
+    const rows = (await this.prisma.eventReservation.findMany({
       where: { customerId: customer.id },
       orderBy: { createdAt: 'desc' },
-      include: {
-        restaurant: { select: { id: true, name: true, city: true, area: true } },
-        event: {
-          select: {
-            id: true,
-            title: true,
-            startsAt: true,
-            endsAt: true,
-            capacity: true,
-          },
-        },
-        statusHistory: {
-          orderBy: { createdAt: 'asc' },
-          select: {
-            id: true,
-            fromStatus: true,
-            toStatus: true,
-            note: true,
-            createdAt: true,
-          },
-        },
-      },
-    });
+      include: eventReservationDetailForCustomer,
+    } as any)) as any[];
+    return rows.map((r) => toCustomerEventReservationView(r));
   }
 
   async cancelMyEventReservation(
     eventReservationId: string,
     customer: SafeUser,
     dto: CancelMyReservationDto,
-  ) {
+  ): Promise<CustomerEventReservationResponse> {
     if (customer.role !== Role.CUSTOMER) {
       throw new ForbiddenException();
     }
@@ -272,32 +290,11 @@ export class EventReservationService {
         data: { status: EventReservationStatus.CANCELLED },
       });
 
-      return this.prisma.eventReservation.findFirstOrThrow({
+      return tx.eventReservation.findFirstOrThrow({
         where: { id: row.id },
-        include: {
-          restaurant: { select: { id: true, name: true, city: true, area: true } },
-          event: {
-            select: {
-              id: true,
-              title: true,
-              startsAt: true,
-              endsAt: true,
-              capacity: true,
-            },
-          },
-          statusHistory: {
-            orderBy: { createdAt: 'asc' },
-            select: {
-              id: true,
-              fromStatus: true,
-              toStatus: true,
-              note: true,
-              createdAt: true,
-            },
-          },
-        },
-      });
-    });
+        include: eventReservationDetailForCustomer,
+      } as any);
+    }).then((r) => toCustomerEventReservationView(r as any));
   }
 
   private async sumConfirmedSeatsExcluding(
@@ -316,35 +313,44 @@ export class EventReservationService {
     return r._sum.partySize ?? 0;
   }
 
+  async getRestaurantEventReservation(
+    restaurantId: string,
+    eventReservationId: string,
+    user: SafeUser,
+  ): Promise<AdminEventReservationResponse> {
+    await this.assertCanManage(user, restaurantId);
+    if (user.role === Role.CUSTOMER) {
+      throw new ForbiddenException();
+    }
+    const row = await this.prisma.eventReservation.findFirst({
+      where: { id: eventReservationId, restaurantId },
+      include: eventReservationDetailForAdmin,
+    } as any);
+    if (!row) {
+      throw new NotFoundException('Event reservation not found');
+    }
+    return toAdminEventReservationView(row as any);
+  }
+
   async listRestaurantEventReservations(
     restaurantId: string,
     user: SafeUser,
     eventId?: string,
-  ) {
+  ): Promise<AdminEventReservationResponse[]> {
     await this.assertCanManage(user, restaurantId);
     if (user.role === Role.CUSTOMER) {
       throw new ForbiddenException();
     }
 
-    return this.prisma.eventReservation.findMany({
+    const rows = (await this.prisma.eventReservation.findMany({
       where: {
         restaurantId,
         ...(eventId ? { eventId } : {}),
       },
       orderBy: { createdAt: 'desc' },
-      include: {
-        customer: {
-          select: { id: true, email: true, fullName: true, phone: true },
-        },
-        event: { select: { id: true, title: true, startsAt: true, endsAt: true, capacity: true } },
-        statusHistory: {
-          orderBy: { createdAt: 'asc' },
-          include: {
-            changedBy: { select: { id: true, fullName: true, email: true } },
-          },
-        },
-      },
-    });
+      include: eventReservationDetailForAdmin,
+    } as any)) as any[];
+    return rows.map((r) => toAdminEventReservationView(r));
   }
 
   async updateEventReservationStatus(
@@ -352,7 +358,7 @@ export class EventReservationService {
     eventReservationId: string,
     dto: UpdateEventReservationStatusDto,
     actor: SafeUser,
-  ) {
+  ): Promise<AdminEventReservationResponse> {
     if (actor.role === Role.CUSTOMER) {
       throw new ForbiddenException();
     }
@@ -361,7 +367,7 @@ export class EventReservationService {
     return this.prisma.$transaction(async (tx) => {
       const row = await tx.eventReservation.findFirst({
         where: { id: eventReservationId, restaurantId },
-        include: { event: true },
+        include: { event: { select: { id: true, capacity: true } } },
       });
       if (!row) {
         throw new NotFoundException('Event reservation not found');
@@ -418,19 +424,8 @@ export class EventReservationService {
               ? rejectionReason
               : null,
         },
-        include: {
-          customer: {
-            select: { id: true, email: true, fullName: true, phone: true },
-          },
-          event: { select: { id: true, title: true, startsAt: true, endsAt: true, capacity: true } },
-          statusHistory: {
-            orderBy: { createdAt: 'asc' },
-            include: {
-              changedBy: { select: { id: true, fullName: true, email: true } },
-            },
-          },
-        },
-      });
-    });
+        include: eventReservationDetailForAdmin,
+      } as any);
+    }).then((r) => toAdminEventReservationView(r as any));
   }
 }

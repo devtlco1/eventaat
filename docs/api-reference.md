@@ -182,19 +182,35 @@ All routes: **Bearer** + **PLATFORM_ADMIN** only.
 
 All routes: **Bearer** + **CUSTOMER** only (via `@Roles`).
 
+**Reservation JSON shape (both flows):** responses are **normalized** so UIs can tell **table** vs **event** at a glance:
+
+- **Table** items and detail always include `type: "TABLE"`, a **restaurant** summary (`id`, `name`, `city`, `area`), `requestedAt` (ISO — when the request row was created, same as row `createdAt` serialized), `note` (mirrors `specialRequest` when set), and `statusHistory`: an array ordered **oldest → newest** (one entry per transition). Each history line has `id`, `fromStatus`, `toStatus`, `note`, `createdAt` (ISO), and `changedBy: { id, fullName, email } | null` when the server stored an actor. **Rejection** / **cancellation** “reasons” for tables are only present when derivable from history **notes** on transitions to `REJECTED` or `CANCELLED` (fields `rejectionReason`, `cancellationReason` on the object—otherwise `null`).
+
+- **Event** items and detail always include `type: "EVENT"`, **restaurant** and **event** summaries (event includes `isFree`, `price`, `currency` as stored), `note` (mirrors `specialRequest`), `rejectionReason` when set on the row, `cancellationReason` when the last `CANCELLED` transition’s note is available, and `statusHistory` in the same **oldest → newest** order with the same per-line fields as table history.
+
 ### `GET /me/reservations`
 
-**200:** Array of the caller’s **table** reservations (includes `restaurant`, `table?`, and optional `statusHistory` as implemented).
+**200:** `CustomerTableReservationResponse[]` (see table shape above).
+
+### `GET /me/reservations/:reservationId`
+
+**Params:** `reservationId` — UUID.  
+**200:** Single table reservation, same object shape as a list item. **404** if the reservation is missing or not owned by the caller.
 
 ### `PATCH /me/reservations/:reservationId/cancel`
 
 **Body (optional):** `{ "note": "string" }` (see `CancelMyReservationDto`)
 
-**200:** Updated reservation (shape per service). **400** for disallowed state/time.
+**200:** Updated reservation (same shape as `GET` item). **400** for disallowed state/time.
 
 ### `GET /me/event-reservations`
 
-**200:** Array of the caller’s **event night** booking requests (includes `event`, `restaurant`, `statusHistory` as implemented). Distinct from table reservations.
+**200:** `CustomerEventReservationResponse[]` (see event shape above).
+
+### `GET /me/event-reservations/:eventReservationId`
+
+**Params:** `eventReservationId` — UUID.  
+**200:** Single event reservation, same object shape as a list item. **404** if not found or not owned by the caller.
 
 ### `PATCH /me/event-reservations/:eventReservationId/cancel`
 
@@ -270,7 +286,8 @@ Returns slots and tables (shape per `getAvailability`).
 | Method | Path | Roles | Notes |
 |--------|------|-------|--------|
 | `POST` | `…/events/:eventId/reservations` | **CUSTOMER** | `CreateEventReservationDto` — new row **PENDING** |
-| `GET` | `…/event-reservations` | `PLATFORM_ADMIN`, `RESTAURANT_ADMIN` | Optional query `eventId` |
+| `GET` | `…/event-reservations` | `PLATFORM_ADMIN`, `RESTAURANT_ADMIN` | Optional query `eventId` — each item: `type: "EVENT"`, `statusHistory` oldest→newest, full `event` + `restaurant` |
+| `GET` | `…/event-reservations/:eventReservationId` | `PLATFORM_ADMIN`, `RESTAURANT_ADMIN` | **404** if not in restaurant or not assignable; same `AdminEventReservationResponse` as list item |
 | `PATCH` | `…/event-reservations/:eventReservationId/status` | `PLATFORM_ADMIN`, `RESTAURANT_ADMIN` | `CONFIRMED` or `REJECTED` — capacity enforced on confirm |
 
 **Event reservation body (create):**
@@ -308,9 +325,10 @@ The assigned user is expected to have role `RESTAURANT_ADMIN` (enforced in servi
 
 | Method | Path | Roles | Notes |
 |--------|------|-------|--------|
-| `POST` | `…/reservations` | **CUSTOMER** | `CreateReservationDto` — **PENDING** table request (optional `tableId`) |
-| `GET` | `…/reservations` | `PLATFORM_ADMIN`, `RESTAURANT_ADMIN` (assigned) | All requests for the restaurant as implemented |
-| `GET` | `…/reservations/:reservationId/history` | `PLATFORM_ADMIN`, `RESTAURANT_ADMIN` (assigned) | Status change audit |
+| `POST` | `…/reservations` | **CUSTOMER** | `CreateReservationDto` — **PENDING** table request (optional `tableId`); **200** body includes `type: "TABLE"` and embedded `statusHistory` |
+| `GET` | `…/reservations` | `PLATFORM_ADMIN`, `RESTAURANT_ADMIN` (assigned) | All requests — each: `type: "TABLE"`, `customer`, `restaurant`, `statusHistory` oldest→newest |
+| `GET` | `…/reservations/:reservationId` | `PLATFORM_ADMIN`, `RESTAURANT_ADMIN` (assigned) | Single table reservation for that restaurant; **404** if not found for restaurant |
+| `GET` | `…/reservations/:reservationId/history` | `PLATFORM_ADMIN`, `RESTAURANT_ADMIN` (assigned) | Status change entries only (same information is also embedded in list/detail reservation objects) |
 | `PATCH` | `…/reservations/:reservationId/status` | `PLATFORM_ADMIN`, `RESTAURANT_ADMIN` (assigned) | `UpdateReservationStatusDto` (lifecycle rules in service) |
 
 **Create (example, shape):** includes `partySize`, `startAt`, `endAt`, guest and seating fields, optional `tableId` — see `CreateReservationDto` in the repo.

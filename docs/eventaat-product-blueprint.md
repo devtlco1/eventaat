@@ -84,7 +84,7 @@ The following **exist in the current rebuilt system** and form the base for all 
 | **Event reservations (booking for an event night)** | **Separate** from table reservations: `EventReservation` links `customerId`, `restaurantId`, and `eventId`. New requests start **PENDING**; **restaurant** (or platform) **CONFIRM** or **REJECT**; **capacity** (when set on the event) is enforced on **confirm** (only **CONFIRMED** party sizes count; **PENDING/REJECTED/CANCELLED** do not). No payment, no image upload. |
 | **Mobile customer app** | Expo: **Home** is **events-first**, then **restaurants**; **Event detail** (event request: party + optional note) vs **Restaurant detail** (table request) are separate. **My Reservations** lists **EVENT** and **TABLE** sections. |
 | **Admin dashboard** | Next.js: restaurants, tables, users, admin assignments, **per-restaurant events**, **per-restaurant table reservations** and a separate **per-restaurant event reservations** list with confirm/reject. |
-| **My Reservations** | Customer list: **event** requests and **table** requests, clearly separated. |
+| **My Reservations** | Customer list: **event** requests and **table** requests, clearly separated. API responses use explicit `type: "TABLE" \| "EVENT"`, with **oldest→newest** `statusHistory` and optional **detail GETs** for a single request so the mobile app and admin can show a consistent timeline. |
 | **Reservation status management** | Admins can move requests through the business states (see [§5](#5-reservation-lifecycle)). |
 
 **Architecture note:** Monorepo with API (NestJS + Prisma + PostgreSQL), admin web app, and mobile app; **this blueprint does not prescribe file layout**—only product behavior and phased priorities.
@@ -274,7 +274,7 @@ Phases 3–8 can be **partially parallel** where dependencies allow, but **lifec
 
 ## 17. Next Recommended Engineering Step
 
-**Status:** reservation history and a dedicated **event reservation** flow (separate from table reservations) are implemented; see API and mobile behavior above.
+**Status:** reservation history and a dedicated **event reservation** flow (separate from table reservations) are implemented. **Step 36** (reservation **detail and status history consistency**): all list and detail responses expose a clear `type` discriminator, embedded **status history** in **chronological** order, and **customer/ restaurant/ event** context as documented in `docs/api-reference.md`—so users are not left guessing whether a screen refers to a **table** or **event** request.
 
 **Previously recommended: Step 26 — Reservation status history and lifecycle hardening** (largely addressed; further hardening remains in Phase 2)
 

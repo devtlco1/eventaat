@@ -17,9 +17,9 @@ import {
   Restaurant,
   RestaurantAdmin,
   RestaurantContact,
-  Reservation,
   RestaurantTable,
 } from '@prisma/client';
+import type { CustomerTableReservationResponse } from './reservation-response.mappers';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -306,6 +306,24 @@ export class RestaurantsController {
     );
   }
 
+  /**
+   * GET /restaurants/:restaurantId/event-reservations/:eventReservationId
+   * Admin: single event reservation.
+   */
+  @Get(':restaurantId/event-reservations/:eventReservationId')
+  @Roles('PLATFORM_ADMIN', 'RESTAURANT_ADMIN')
+  getRestaurantEventReservation(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @Param('eventReservationId', new ParseUUIDPipe()) eventReservationId: string,
+    @CurrentUser() user: SafeUser,
+  ) {
+    return this.eventReservations.getRestaurantEventReservation(
+      restaurantId,
+      eventReservationId,
+      user,
+    );
+  }
+
   @Patch(':restaurantId/event-reservations/:eventReservationId/status')
   @Roles('PLATFORM_ADMIN', 'RESTAURANT_ADMIN')
   updateEventReservationStatus(
@@ -452,7 +470,7 @@ export class RestaurantsController {
     @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
     @Body() dto: CreateReservationDto,
     @CurrentUser() user: SafeUser,
-  ): Promise<Reservation> {
+  ): Promise<CustomerTableReservationResponse> {
     return this.restaurants.createReservation(restaurantId, dto, user);
   }
 
@@ -468,6 +486,24 @@ export class RestaurantsController {
     @CurrentUser() user: SafeUser,
   ) {
     return this.restaurants.listRestaurantReservations(restaurantId, user);
+  }
+
+  /**
+   * GET /restaurants/:restaurantId/reservations/:reservationId
+   * Single table reservation (same fields as list rows). Admin only.
+   */
+  @Get(':restaurantId/reservations/:reservationId')
+  @Roles('PLATFORM_ADMIN', 'RESTAURANT_ADMIN')
+  getRestaurantReservation(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @Param('reservationId', new ParseUUIDPipe()) reservationId: string,
+    @CurrentUser() user: SafeUser,
+  ) {
+    return this.restaurants.getRestaurantTableReservation(
+      restaurantId,
+      reservationId,
+      user,
+    );
   }
 
   /**

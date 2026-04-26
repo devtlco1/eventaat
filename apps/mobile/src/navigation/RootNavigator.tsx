@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { EventDetailScreen } from '../screens/EventDetailScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { LoginScreen } from '../screens/LoginScreen';
+import { ReservationDetailScreen } from '../screens/ReservationDetailScreen';
 import { ReservationsScreen } from '../screens/ReservationsScreen';
 import { RestaurantDetailScreen } from '../screens/RestaurantDetailScreen';
 
@@ -17,6 +18,8 @@ export type RootStackParamList = {
   /** Normal reservation request; never pass eventId. */
   RestaurantDetail: { restaurantId: string; name: string };
   Reservations: undefined;
+  /** Customer-only; TABLE vs EVENT must match the reservation. */
+  ReservationDetail: { kind: 'TABLE' | 'EVENT'; id: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -85,6 +88,11 @@ export function RootNavigator() {
             name="Reservations"
             component={ReservationsScreen}
             options={{ title: 'My reservations' }}
+          />
+          <Stack.Screen
+            name="ReservationDetail"
+            component={ReservationDetailScreen}
+            options={{ title: 'Reservation' }}
           />
         </>
       )}

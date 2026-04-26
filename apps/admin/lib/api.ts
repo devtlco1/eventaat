@@ -198,7 +198,22 @@ export type BookingType =
 
 export type AdminReservationStatus = Exclude<ReservationStatus, 'PENDING'>;
 
+/** Table reservation status line (oldest → newest; matches API `PublicTableStatusHistoryItem`). */
+export type TableStatusHistoryItem = {
+  id: string;
+  fromStatus: ReservationStatus | null;
+  toStatus: ReservationStatus;
+  note: string | null;
+  createdAt: string;
+  changedBy: { id: string; fullName: string; email: string } | null;
+};
+
+/**
+ * Server-normalized table reservation (admin). Always `type: "TABLE"`.
+ * Dates are ISO strings in JSON.
+ */
 export type RestaurantReservation = {
+  type: 'TABLE';
   id: string;
   customerId: string;
   restaurantId: string;
@@ -215,29 +230,23 @@ export type RestaurantReservation = {
   specialRequest: string | null;
   createdAt: string;
   updatedAt: string;
+  /** ISO — when the request was created. */
+  requestedAt: string;
+  /** UI convenience: same as `specialRequest` when present. */
+  note: string | null;
+  /** From history when available (reject transition note), else null. */
+  rejectionReason: string | null;
+  /** From history when last transition is to CANCELLED, else null. */
+  cancellationReason: string | null;
   customer: {
     id: string;
     email: string;
     fullName: string;
     phone: string | null;
   };
+  restaurant: { id: string; name: string; city: string; area: string | null };
   table: Pick<RestaurantTable, 'id' | 'name' | 'capacity'> | null;
-  statusHistory?: RestaurantReservationHistoryEntry[];
-};
-
-export type RestaurantReservationHistoryEntry = {
-  id: string;
-  reservationId: string;
-  changedByUserId: string | null;
-  fromStatus: ReservationStatus | null;
-  toStatus: ReservationStatus;
-  note: string | null;
-  createdAt: string;
-  changedBy: {
-    id: string;
-    fullName: string;
-    email: string;
-  } | null;
+  statusHistory: TableStatusHistoryItem[];
 };
 
 export function listRestaurantReservations(
@@ -246,6 +255,17 @@ export function listRestaurantReservations(
 ): Promise<RestaurantReservation[]> {
   return apiRequest<RestaurantReservation[]>(
     `/restaurants/${restaurantId}/reservations`,
+    { method: 'GET', token },
+  );
+}
+
+export function getRestaurantTableReservation(
+  token: string,
+  restaurantId: string,
+  reservationId: string,
+): Promise<RestaurantReservation> {
+  return apiRequest<RestaurantReservation>(
+    `/restaurants/${restaurantId}/reservations/${reservationId}`,
     { method: 'GET', token },
   );
 }
@@ -273,7 +293,18 @@ export type EventReservationStatus =
   | 'REJECTED'
   | 'CANCELLED';
 
+export type EventStatusHistoryItem = {
+  id: string;
+  fromStatus: EventReservationStatus | null;
+  toStatus: EventReservationStatus;
+  note: string | null;
+  createdAt: string;
+  changedBy: { id: string; fullName: string; email: string } | null;
+};
+
+/** Event night reservation (admin). Always `type: "EVENT"`. */
 export type AdminEventReservation = {
+  type: 'EVENT';
   id: string;
   customerId: string;
   restaurantId: string;
@@ -281,7 +312,9 @@ export type AdminEventReservation = {
   partySize: number;
   status: EventReservationStatus;
   specialRequest: string | null;
+  note: string | null;
   rejectionReason: string | null;
+  cancellationReason: string | null;
   createdAt: string;
   updatedAt: string;
   customer: {
@@ -290,21 +323,18 @@ export type AdminEventReservation = {
     fullName: string;
     phone: string | null;
   };
+  restaurant: { id: string; name: string; city: string; area: string | null };
   event: {
     id: string;
     title: string;
     startsAt: string;
     endsAt: string;
     capacity: number | null;
+    isFree: boolean;
+    price: string | null;
+    currency: string;
   };
-  statusHistory: Array<{
-    id: string;
-    fromStatus: EventReservationStatus | null;
-    toStatus: EventReservationStatus;
-    note: string | null;
-    createdAt: string;
-    changedBy: { id: string; fullName: string; email: string } | null;
-  }>;
+  statusHistory: EventStatusHistoryItem[];
 };
 
 export function listRestaurantEventReservations(
@@ -317,6 +347,17 @@ export function listRestaurantEventReservations(
   const qs = p.toString();
   return apiRequest<AdminEventReservation[]>(
     `/restaurants/${restaurantId}/event-reservations${qs ? `?${qs}` : ''}`,
+    { method: 'GET', token },
+  );
+}
+
+export function getRestaurantEventReservation(
+  token: string,
+  restaurantId: string,
+  eventReservationId: string,
+): Promise<AdminEventReservation> {
+  return apiRequest<AdminEventReservation>(
+    `/restaurants/${restaurantId}/event-reservations/${eventReservationId}`,
     { method: 'GET', token },
   );
 }

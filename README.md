@@ -7,7 +7,7 @@ Restaurant table reservation platform.
 ## API documentation
 
 - **Narrated contract & examples:** [docs/api-reference.md](docs/api-reference.md) — method, path, auth, roles, request/response shapes, and business rules.
-- **Index & counts:** [docs/api-inventory.md](docs/api-inventory.md) — single table of all routes, **47** endpoints, grouped by domain.
+- **Index & counts:** [docs/api-inventory.md](docs/api-inventory.md) — single table of all routes, **51** endpoints, grouped by domain.
 - **OpenAPI (when the API is running, default port 4000):** [http://localhost:4000/docs](http://localhost:4000/docs) (Swagger UI) and [http://localhost:4000/docs-json](http://localhost:4000/docs-json) (JSON). Supplements the markdown; **the markdown and inventory are the definition of done** for prose and the route list.
 
 ### API documentation maintenance (definition of done)
@@ -74,13 +74,13 @@ On every **push** or **pull request** to `main`, [`.github/workflows/ci.yml`](.g
 
 ## Project status
 
-Milestones in place: monorepo foundation; **API** (Nest, health) + **Prisma/PostgreSQL**; **auth** (JWT, register/login) and **RBAC**; **users** (platform management); **restaurants** (CRUD, assignments for restaurant admins); **request-based table reservations** (optional table) with **availability** helper; **reservation status history** and lifecycle rules; **event nights (restaurant events)** with **platform approval**; **event reservations** (separate from table flow, **PENDING** until restaurant confirms, **capacity** on confirm); **admin** (Next.js, webpack) and **mobile** (Expo) apps; **My Reservations**; **operating settings**; **customer cancellation** (eligible requests); **restaurant profile** metadata and contacts; **global request validation** (DTO / `ValidationPipe`); documented local workflow; **CI** (see above). **API usage & validation** detail: [apps/api/README.md#request-validation](apps/api/README.md#request-validation).
+Milestones in place: monorepo foundation; **API** (Nest, health) + **Prisma/PostgreSQL**; **auth** (JWT, register/login) and **RBAC**; **users** (platform management); **restaurants** (CRUD, assignments for restaurant admins); **request-based table reservations** (optional table) with **availability** helper; **reservation status history** and lifecycle rules; **event nights (restaurant events)** with **platform approval**; **event reservations** (separate from table flow, **PENDING** until restaurant confirms, **capacity** on confirm); **admin** (Next.js, webpack) and **mobile** (Expo) apps; **My Reservations**; **operating settings**; **customer cancellation** (eligible requests); **restaurant profile** metadata and contacts; **global request validation** (DTO / `ValidationPipe`); documented local workflow; **CI** (see above). **Step 36** aligned **table vs event** reservation **API shapes** (explicit `type`, normalized detail GETs, **oldest→newest** `statusHistory`, and reasons where stored). **API usage & validation** detail: [apps/api/README.md#request-validation](apps/api/README.md#request-validation).
 
 ## Current MVP capabilities
 
 - **Customer** (mobile): **Home** is **events-first** (approved, active, upcoming **event nights**), then **restaurants**; **event cards** open **Event detail** to submit an **event reservation request** (pending until the restaurant approves; date/time from the event); **restaurant cards** open **Restaurant detail** for the **normal table reservation request** flow. The two flows stay separate: **EVENT** uses `eventId` + `restaurantId`; **RESTAURANT** uses `restaurantId` only.
 - **Customer** can sign in, browse from **Home**, and submit a **table reservation request** and/or an **event reservation request**
-- **Customer** can see **My Reservations** with **EVENT** vs **table** sections, **status and history**
+- **Customer** can see **My Reservations** with **EVENT** vs **table** sections, **status, detail screens, and history (timeline order)**
 - **Customer** can **cancel** eligible requests (e.g. pending/held/confirmed, before start time) where rules allow
 - **Platform / restaurant admin** can manage **restaurants**, **assign restaurant admins**, and update **reservation status**
 - **Admin** can manage **operating settings** and **restaurant profile** (URLs, descriptions, **contacts**)

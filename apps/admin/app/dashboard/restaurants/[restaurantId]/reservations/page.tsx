@@ -196,6 +196,7 @@ export default function RestaurantReservationsPage() {
           <table className="min-w-full text-left text-sm">
             <thead className="bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500">
               <tr>
+                <th className="px-6 py-3">Type</th>
                 <th className="px-6 py-3">Customer</th>
                 <th className="px-6 py-3">Table</th>
                 <th className="px-6 py-3">Party</th>
@@ -210,13 +211,13 @@ export default function RestaurantReservationsPage() {
             <tbody className="divide-y divide-zinc-200">
               {loading ? (
                 <tr>
-                  <td className="px-6 py-4 text-zinc-600" colSpan={9}>
+                  <td className="px-6 py-4 text-zinc-600" colSpan={10}>
                     Loading reservations…
                   </td>
                 </tr>
               ) : reservations.length === 0 ? (
                 <tr>
-                  <td className="px-6 py-4 text-zinc-600" colSpan={9}>
+                  <td className="px-6 py-4 text-zinc-600" colSpan={10}>
                     No reservations found.
                   </td>
                 </tr>
@@ -240,10 +241,16 @@ export default function RestaurantReservationsPage() {
                     ? r.table.name
                     : 'Request only';
                   const history = r.statusHistory ?? [];
+                  const typeLabel = r.type ?? 'TABLE';
 
                   return (
                     <Fragment key={r.id}>
                     <tr className="hover:bg-zinc-50/50">
+                      <td className="px-6 py-4 align-top">
+                        <span className="text-xs font-semibold text-zinc-800">
+                          {typeLabel}
+                        </span>
+                      </td>
                       <td className="px-6 py-4">
                         <div className="font-medium text-zinc-900">
                           {customerLabel}
@@ -268,6 +275,14 @@ export default function RestaurantReservationsPage() {
                         <div className="text-zinc-500">{r.bookingType}</div>
                       </td>
                       <td className="max-w-[14rem] px-6 py-4 text-xs text-zinc-700">
+                        <div className="text-[11px] text-zinc-500">
+                          Submitted: {r.requestedAt ? fmt(r.requestedAt) : '—'}
+                        </div>
+                        {r.restaurant ? (
+                          <div className="mt-0.5 text-zinc-600" title={r.restaurant.name}>
+                            {r.restaurant.name}
+                          </div>
+                        ) : null}
                         {r.customerPhone ? (
                           <div>
                             <span className="font-medium text-zinc-800">Phone: </span>
@@ -288,8 +303,23 @@ export default function RestaurantReservationsPage() {
                             {r.specialRequest}
                           </div>
                         ) : null}
-                        {!r.occasionNote && !r.specialRequest ? (
-                          <div className="mt-1 text-zinc-400">—</div>
+                        {r.rejectionReason ? (
+                          <div
+                            className="mt-1 line-clamp-2 text-amber-900/90"
+                            title={r.rejectionReason}
+                          >
+                            <span className="font-medium">Reject: </span>
+                            {r.rejectionReason}
+                          </div>
+                        ) : null}
+                        {r.cancellationReason ? (
+                          <div
+                            className="mt-1 line-clamp-2 text-zinc-600"
+                            title={r.cancellationReason}
+                          >
+                            <span className="font-medium">Cancel: </span>
+                            {r.cancellationReason}
+                          </div>
                         ) : null}
                       </td>
                       <td className="px-6 py-4">
@@ -337,7 +367,7 @@ export default function RestaurantReservationsPage() {
                     </tr>
                     {history.length > 0 ? (
                       <tr className="bg-zinc-50/40">
-                        <td colSpan={9} className="px-6 py-2">
+                        <td colSpan={10} className="px-6 py-2">
                           <details>
                             <summary className="cursor-pointer text-xs font-medium text-zinc-600">
                               Status history ({history.length})

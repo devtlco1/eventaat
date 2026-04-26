@@ -153,6 +153,8 @@ export type CreateReservationRequestBody = {
   tableId?: string;
 };
 
+export type StatusActor = { id: string; fullName: string; email: string } | null;
+
 export type ReservationRecord = {
   id: string;
   customerId: string;
@@ -172,16 +174,22 @@ export type ReservationRecord = {
   updatedAt: string;
 };
 
-/** Status audit entries for GET /me/reservations (no actor details). */
-export type ReservationStatusChangeSummary = {
+export type TableStatusHistoryItem = {
+  id: string;
   fromStatus: ReservationStatus | null;
   toStatus: ReservationStatus;
   note: string | null;
   createdAt: string;
+  changedBy: StatusActor;
 };
 
-/** Response from GET /me/reservations (includes restaurant + table when set). */
-export type MyReservation = ReservationRecord & {
+/** Table reservation (GET /me/reservations, …). `type` distinguishes from event flow. */
+export type MyTableReservation = ReservationRecord & {
+  type: 'TABLE';
+  requestedAt: string;
+  note: string | null;
+  rejectionReason: string | null;
+  cancellationReason: string | null;
   restaurant: {
     id: string;
     name: string;
@@ -189,22 +197,26 @@ export type MyReservation = ReservationRecord & {
     area: string | null;
   };
   table: { id: string; name: string; capacity: number } | null;
-  /** Omitted on older API versions. */
-  statusHistory?: ReservationStatusChangeSummary[];
+  statusHistory: TableStatusHistoryItem[];
 };
+
+/** @deprecated use MyTableReservation */
+export type MyReservation = MyTableReservation;
 
 export type EventReservationStatus = 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'CANCELLED';
 
-export type EventReservationStatusChangeSummary = {
+export type EventStatusHistoryItem = {
   id: string;
   fromStatus: EventReservationStatus | null;
   toStatus: EventReservationStatus;
   note: string | null;
   createdAt: string;
+  changedBy: StatusActor;
 };
 
-/** Event night booking request — distinct from table reservations. */
+/** Event night booking request (GET /me/event-reservations, …). */
 export type MyEventReservation = {
+  type: 'EVENT';
   id: string;
   customerId: string;
   restaurantId: string;
@@ -212,7 +224,9 @@ export type MyEventReservation = {
   partySize: number;
   status: EventReservationStatus;
   specialRequest: string | null;
+  note: string | null;
   rejectionReason: string | null;
+  cancellationReason: string | null;
   createdAt: string;
   updatedAt: string;
   restaurant: {
@@ -227,6 +241,9 @@ export type MyEventReservation = {
     startsAt: string;
     endsAt: string;
     capacity: number | null;
+    isFree: boolean;
+    price: string | null;
+    currency: string;
   };
-  statusHistory?: EventReservationStatusChangeSummary[];
+  statusHistory: EventStatusHistoryItem[];
 };
