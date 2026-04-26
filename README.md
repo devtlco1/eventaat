@@ -2,7 +2,7 @@
 
 Restaurant table reservation platform.
 
-**Local development:** follow **[docs/local-development.md](docs/local-development.md)** for a stable workflow (Node 22, Docker Postgres, API, admin with webpack, Expo).
+**Local development:** **[docs/local-development.md](docs/local-development.md)** (Node 22, Docker Postgres, API, admin with webpack, Expo). **Product vision & roadmap:** **[docs/eventaat-product-blueprint.md](docs/eventaat-product-blueprint.md)**.
 
 ## Structure
 
@@ -62,12 +62,25 @@ API details, curl examples, and **request validation** (global DTO `ValidationPi
 
 On every **push** or **pull request** to `main`, [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on Node **22** with `npm ci`, then: `api:generate`, `check:api`, `api:build`, `check:admin`, `admin:build`, and `check:mobile`. No database or migrations — only compile-time checks. The **Quality checks** block in [docs/local-development.md](docs/local-development.md) lists the same commands to run locally.
 
-## Status
+## Project status
 
-- Step 1 — monorepo skeleton
-- Step 2 — API foundation (`/health`)
-- Step 3 — Prisma + `User` model + DB-aware health
-- Step 4 — auth foundation (`/auth/register`, `/auth/login`)
-- Step 5 — auth protection + RBAC (`/auth/me`, `@CurrentUser`, `@Roles`, `RolesGuard`)
-- Step 6 — restaurants foundation (`Restaurant` model + admin-only create/update)
-- Step 7 (next) — reservations
+Milestones in place: monorepo foundation; **API** (Nest, health) + **Prisma/PostgreSQL**; **auth** (JWT, register/login) and **RBAC**; **users** (platform management); **restaurants** (CRUD, assignments for restaurant admins); **request-based reservations** (optional table) with **availability** helper; **reservation status history** and lifecycle rules; **admin** (Next.js, webpack) and **mobile** (Expo) apps; **My Reservations**; **operating settings**; **customer cancellation** (eligible requests); **restaurant profile** metadata and contacts; **global request validation** (DTO / `ValidationPipe`); documented local workflow; **CI** (see above). **API usage & validation** detail: [apps/api/README.md#request-validation](apps/api/README.md#request-validation).
+
+## Current MVP capabilities
+
+- **Customer** can sign in, browse restaurants, and submit a **reservation request** (not fixed table selection)
+- **Customer** can see **My Reservations** with **status and history**
+- **Customer** can **cancel** eligible requests (e.g. pending/held/confirmed, before start time) where rules allow
+- **Platform / restaurant admin** can manage **restaurants**, **assign restaurant admins**, and update **reservation status**
+- **Admin** can manage **operating settings** and **restaurant profile** (URLs, descriptions, **contacts**)
+- **CI** on `main` validates **API, admin, and mobile** (generate, typecheck, build) — [workflow](.github/workflows/ci.yml)
+
+## Current recommended next work
+
+- Event nights foundation
+- Offers (later)
+- Discovery / favorites (later)
+- Notifications (later)
+- Payments / deposits (later)
+
+*(Roadmap context: [eventaat-product-blueprint.md](docs/eventaat-product-blueprint.md).)*
