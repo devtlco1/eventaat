@@ -3,16 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3000",
-    "build": "next build",
-    "start": "next start",
+    "dev": "node --max-old-space-size=8192 ../../node_modules/next/dist/bin/next dev -p 3000 --webpack",
+    "build": "node --max-old-space-size=8192 ../../node_modules/next/dist/bin/next build --webpack",
+    "start": "node ../../node_modules/next/dist/bin/next start",
     "lint": "eslint",
-    "typecheck": "tsc -p tsconfig.typecheck.json --noEmit"
+    "typecheck": "node --max-old-space-size=8192 ../../node_modules/typescript/lib/tsc.js -p tsconfig.typecheck.json --noEmit"
   },
   "dependencies": {
-    "next": "^16.2.4",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "next": "16.2.4",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -20,8 +20,8 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "^16.2.4",
+    "eslint-config-next": "16.2.4",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "5.5.4"
   }
 }
