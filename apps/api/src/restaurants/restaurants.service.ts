@@ -11,6 +11,9 @@ import {
   Restaurant,
   RestaurantAdmin,
   ReservationStatus,
+  BookingType,
+  GuestType,
+  SeatingPreference,
   RestaurantContact,
   RestaurantContactType,
   RestaurantEventStatus,
@@ -25,6 +28,7 @@ import { SafeUser } from '../users/users.service';
 import { AvailabilityQueryDto } from './dto/availability-query.dto';
 import { CreateRestaurantDto } from './dto/create-restaurant.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
+import { CreateAdminTableReservationDto } from './dto/create-admin-table-reservation.dto';
 import { CreateRestaurantTableDto } from './dto/create-restaurant-table.dto';
 import { UpdateRestaurantDto } from './dto/update-restaurant.dto';
 import { UpdateReservationStatusDto } from './dto/update-reservation-status.dto';
@@ -1051,6 +1055,133 @@ export class RestaurantsService {
         include: tableReservationDetailForCustomer,
       } as any);
     }).then((row) => toCustomerTableReservationView(row as any));
+  }
+
+  /**
+   * Platform or restaurant staff: create a table booking on behalf of a customer (PENDING).
+   */
+  async createAdminReservation(
+    restaurantId: string,
+    dto: CreateAdminTableReservationDto,
+    actor: SafeUser,
+  ): Promise<AdminTableReservationResponse> {
+    if (actor.role !== Role.PLATFORM_ADMIN && actor.role !== Role.RESTAURANT_ADMIN) {
+      throw new ForbiddenException();
+    }
+    await this.assertCanManageRestaurant(actor, restaurantId);
+
+    const customer = await this.prisma.user.findUnique({
+      where: { id: dto.customerId },
+      select: { id: true, role: true },
+    });
+    if (!customer || customer.role !== Role.CUSTOMER) {
+      throw new UnprocessableEntityException(
+        'customerId must reference an active customer account',
+      );
+    }
+
+    const restaurant = await this.prisma.restaurant.findUnique({
+      where: { id: restaurantId },
+      select: { id: true, isActive: true },
+    });
+    if (!restaurant || !restaurant.isActive) {
+      throw new NotFoundException('Restaurant not found');
+    }
+
+    const startAt = new Date(dto.startAt);
+    const endAt = new Date(dto.endAt);
+    const now = new Date();
+    if (!(startAt instanceof Date) || isNaN(startAt.getTime())) {
+      throw new UnprocessableEntityException('startAt must be a valid date');
+    }
+    if (!(endAt instanceof Date) || isNaN(endAt.getTime())) {
+      throw new UnprocessableEntityException('endAt must be a valid date');
+    }
+    if (startAt.getTime() <= now.getTime()) {
+      throw new UnprocessableEntityException('startAt must be in the future');
+    }
+    if (endAt.getTime() <= startAt.getTime()) {
+      throw new UnprocessableEntityException('endAt must be after startAt');
+    }
+
+    await this.assertReservationMeetsOperatingRules(
+      restaurantId,
+      startAt,
+      endAt,
+      dto.partySize,
+    );
+
+    const guestType = dto.guestType ?? GuestType.FAMILY;
+    const seatingPreference = dto.seatingPreference ?? SeatingPreference.INDOOR;
+    const bookingType = dto.bookingType ?? BookingType.STANDARD;
+
+    let tableId: string | null = null;
+    if (dto.tableId) {
+      const table = await this.prisma.restaurantTable.findFirst({
+        where: {
+          id: dto.tableId,
+          restaurantId,
+          isActive: true,
+        },
+        select: { id: true, capacity: true },
+      });
+      if (!table) {
+        throw new NotFoundException('Table not found');
+      }
+      if (dto.partySize > table.capacity) {
+        throw new UnprocessableEntityException(
+          'partySize must not exceed table capacity',
+        );
+      }
+      const overlapping = await this.prisma.reservation.findFirst({
+        where: {
+          tableId: table.id,
+          status: { in: RestaurantsService.TABLE_BLOCKING_STATUSES },
+          startAt: { lt: endAt },
+          endAt: { gt: startAt },
+        },
+        select: { id: true },
+      });
+      if (overlapping) {
+        throw new ConflictException(
+          'Overlapping reservation exists for this table',
+        );
+      }
+      tableId = table.id;
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const created = await tx.reservation.create({
+        data: {
+          customerId: customer.id,
+          restaurantId,
+          tableId,
+          partySize: dto.partySize,
+          startAt,
+          endAt,
+          status: ReservationStatus.PENDING,
+          guestType,
+          seatingPreference,
+          bookingType,
+          occasionNote: null,
+          customerPhone: null,
+          specialRequest: dto.specialRequest?.trim() || null,
+        },
+      });
+      await tx.reservationStatusHistory.create({
+        data: {
+          reservationId: created.id,
+          changedByUserId: actor.id,
+          fromStatus: null,
+          toStatus: ReservationStatus.PENDING,
+          note: 'Reservation request created by staff (admin)',
+        },
+      });
+      return tx.reservation.findFirstOrThrow({
+        where: { id: created.id },
+        include: tableReservationDetailForAdmin,
+      } as any);
+    }).then((row) => toAdminTableReservationView(row as any));
   }
 
   /**

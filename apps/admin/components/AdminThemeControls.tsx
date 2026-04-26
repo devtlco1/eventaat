@@ -24,7 +24,7 @@ function applyAndPersist(dark: boolean) {
   }
 }
 
-export function AdminThemeToggle() {
+export function AdminThemeToggle({ collapsed = false }: { collapsed?: boolean }) {
   const [dark, setDark] = useState(false);
   const [ready, setReady] = useState(false);
 
@@ -38,6 +38,20 @@ export function AdminThemeToggle() {
     applyAndPersist(next);
     setDark(next);
   }, []);
+
+  if (collapsed) {
+    return (
+      <button
+        type="button"
+        onClick={toggle}
+        title={ready ? (dark ? 'Theme: dark' : 'Theme: light') : 'Theme'}
+        suppressHydrationWarning
+        className="mx-auto flex h-9 w-9 items-center justify-center rounded-md border border-zinc-200/90 bg-zinc-50/80 text-sm text-zinc-700 hover:bg-zinc-100/90 dark:border-zinc-600/80 dark:bg-zinc-800/50 dark:text-zinc-200"
+      >
+        {ready ? (dark ? '☽' : '☀') : '·'}
+      </button>
+    );
+  }
 
   return (
     <button

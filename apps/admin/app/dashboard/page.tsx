@@ -1,74 +1,89 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AdminErrorState } from '../../components/admin/AdminErrorState';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
-import { Button } from '../../components/Button';
+import { AdminStatusBadge } from '../../components/admin/AdminStatusBadge';
 import {
   getMe,
-  getReservationOperations,
-  listMyNotifications,
   listRestaurants,
-  listUsers,
-  reviewRestaurantEvent,
   type MeResponse,
-  type PlatformUser,
-  type ReservationOperationsResponse,
   type Restaurant,
   type RestaurantEvent,
-  updateEventReservationStatus,
-  updateReservationStatus,
-  type ReservationOperationsEventItem,
-  type ReservationOperationsTableItem,
+  type RestaurantReservation,
+  type ReservationStatus,
 } from '../../lib/api';
 import { getToken } from '../../lib/auth';
 import {
-  globalEventReservationsPath,
-  globalTableReservationsPath,
-  pendingBookingsPath,
-} from '../../lib/reservationLinks';
-import { loadAllAccessibleEventNights } from '../../lib/staffReservationsData';
+  loadAllAccessibleEventNights,
+  loadAllAccessibleTableReservations,
+} from '../../lib/staffReservationsData';
 
 function fmt(s: string) {
   const d = new Date(s);
   return isNaN(d.getTime()) ? s : d.toLocaleString();
 }
 
-function restName(rl: Restaurant[], id: string) {
-  return rl.find((r) => r.id === id)?.name ?? '—';
+function rsvTone(
+  s: ReservationStatus,
+): Parameters<typeof AdminStatusBadge>[0]['tone'] {
+  switch (s) {
+    case 'PENDING':
+    case 'HELD':
+      return 'yellow';
+    case 'CONFIRMED':
+      return 'blue';
+    case 'REJECTED':
+    case 'CANCELLED':
+      return 'zinc';
+    case 'COMPLETED':
+      return 'green';
+    default:
+      return 'zinc';
+  }
 }
 
-function Counter({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
-  return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/60">
+type Stat = { label: string; value: number; href?: string; sub?: string };
+
+function StatCard({ label, value, sub, href }: Stat) {
+  const inner = (
+    <div className="rounded-lg border border-zinc-200/90 bg-white p-3.5 shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/70">
       <div className="text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
         {label}
       </div>
-      <div className="mt-0.5 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+      <div className="mt-0.5 text-2xl font-semibold tabular-nums text-zinc-900 dark:text-zinc-50">
         {value}
       </div>
       {sub ? (
-        <div className="text-[10px] text-zinc-500 dark:text-zinc-400">{sub}</div>
+        <div className="mt-0.5 text-[10px] text-zinc-500 dark:text-zinc-400">
+          {sub}
+        </div>
       ) : null}
     </div>
   );
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className="block outline-none transition hover:opacity-95 focus-visible:ring-2 focus-visible:ring-amber-500/80"
+      >
+        {inner}
+      </Link>
+    );
+  }
+  return inner;
 }
 
 export default function DashboardPage() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
-  const [allEvents, setAllEvents] = useState<RestaurantEvent[]>([]);
-  const [ops, setOps] = useState<ReservationOperationsResponse | null>(null);
-  const [unread, setUnread] = useState<number>(0);
-  const [recentUsers, setRecentUsers] = useState<PlatformUser[] | null>(null);
-  const [totalUsers, setTotalUsers] = useState<number | null>(null);
+  const [tableBookings, setTableBookings] = useState<RestaurantReservation[]>(
+    [],
+  );
+  const [eventNights, setEventNights] = useState<RestaurantEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [actionBusy, setActionBusy] = useState<Record<string, boolean>>({});
-
-  const isPa = me?.role === 'PLATFORM_ADMIN';
-  const isRa = me?.role === 'RESTAURANT_ADMIN';
-  const isStaff = isPa || isRa;
 
   const load = useCallback(async () => {
     const token = getToken();
@@ -76,40 +91,18 @@ export default function DashboardPage() {
     setErr(null);
     const u = await getMe(token);
     setMe(u);
-    const rest = await listRestaurants(token);
-    setRestaurants(rest);
-    if (u.role === 'PLATFORM_ADMIN') {
-      const uu = await listUsers(token);
-      setTotalUsers(uu.length);
-      setRecentUsers(
-        [...uu].sort(
-          (a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-        ).slice(0, 5),
-      );
-    } else {
-      setTotalUsers(null);
-      setRecentUsers(null);
-    }
+    const rlist = await listRestaurants(token);
+    setRestaurants(rlist);
     if (u.role === 'RESTAURANT_ADMIN' || u.role === 'PLATFORM_ADMIN') {
-      const { events: evs } = await loadAllAccessibleEventNights(token);
-      setAllEvents(evs);
-      const n = await listMyNotifications(token, { limit: 1 }).catch(() => ({
-        notifications: [] as { id: string }[],
-        unreadCount: 0,
-      }));
-      setUnread(n.unreadCount);
-      let o: ReservationOperationsResponse | null = null;
-      try {
-        o = await getReservationOperations(token);
-      } catch {
-        o = null;
-      }
-      setOps(o);
+      const [{ rows }, { events: evs }] = await Promise.all([
+        loadAllAccessibleTableReservations(token),
+        loadAllAccessibleEventNights(token),
+      ]);
+      setTableBookings(rows);
+      setEventNights(evs);
     } else {
-      setAllEvents([]);
-      setOps(null);
-      setUnread(0);
+      setTableBookings([]);
+      setEventNights([]);
     }
   }, []);
 
@@ -130,487 +123,197 @@ export default function DashboardPage() {
     })();
   }, [load]);
 
-  const now = new Date();
-  const pendingNights = allEvents.filter((e) => e.status === 'PENDING');
-  const approvedUpcoming = allEvents.filter(
-    (e) =>
-      e.status === 'APPROVED' &&
-      e.isActive &&
-      new Date(e.endsAt) > now,
-  );
+  const stats = useMemo(() => {
+    const t = tableBookings;
+    const totalBookings = t.length;
+    const pending = t.filter((x) => x.status === 'PENDING').length;
+    const cancelled = t.filter((x) => x.status === 'CANCELLED').length;
+    return { totalBookings, pending, cancelled };
+  }, [tableBookings]);
 
-  const pendingEventRows = (ops?.needsAttention?.filter(
-    (x) => x.type === 'EVENT',
-  ) ?? []) as (ReservationOperationsEventItem & { type: 'EVENT' })[];
-  const pendingTableRows = (ops?.needsAttention?.filter(
-    (x) => x.type === 'TABLE',
-  ) ?? []) as (ReservationOperationsTableItem & { type: 'TABLE' })[];
+  const latestTable = useMemo(() => {
+    return [...tableBookings]
+      .sort(
+        (a, b) =>
+          new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime(),
+      )
+      .slice(0, 8);
+  }, [tableBookings]);
 
-  const nightSlice = pendingNights.slice(0, 5);
-  const tSlice = pendingTableRows.slice(0, 5);
-  const eBookSlice = pendingEventRows.slice(0, 5);
+  const latestNights = useMemo(() => {
+    return [...eventNights]
+      .sort(
+        (a, b) =>
+          new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime(),
+      )
+      .slice(0, 8);
+  }, [eventNights]);
 
-  async function onApproveEventNight(ev: RestaurantEvent) {
-    if (!isPa) return;
-    if (!window.confirm('Approve this event?')) return;
-    const t = getToken();
-    if (!t) return;
-    setActionBusy((m) => ({ ...m, [ev.id]: true }));
-    try {
-      await reviewRestaurantEvent(t, ev.restaurantId, ev.id, { status: 'APPROVED' });
-      await load();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Failed');
-    } finally {
-      setActionBusy((a) => {
-        const c = { ...a };
-        delete c[ev.id];
-        return c;
-      });
-    }
-  }
-  async function onRejectEventNight(ev: RestaurantEvent) {
-    if (!isPa) return;
-    const re = window.prompt('Reason (optional)');
-    if (re === null) return;
-    const t = getToken();
-    if (!t) return;
-    setActionBusy((m) => ({ ...m, [ev.id]: true }));
-    try {
-      await reviewRestaurantEvent(t, ev.restaurantId, ev.id, {
-        status: 'REJECTED',
-        ...(re.trim() ? { rejectionReason: re.trim() } : {}),
-      });
-      await load();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Failed');
-    } finally {
-      setActionBusy((a) => {
-        const c = { ...a };
-        delete c[ev.id];
-        return c;
-      });
-    }
-  }
-
-  async function quickTableConfirm(
-    r: ReservationOperationsTableItem,
-  ) {
-    if (!window.confirm('Confirm this request?')) return;
-    const t = getToken();
-    if (!t) return;
-    setActionBusy((m) => ({ ...m, [r.id]: true }));
-    try {
-      await updateReservationStatus(
-        t,
-        r.restaurant.id,
-        r.id,
-        'CONFIRMED',
-      );
-      await load();
-    } catch (e) {
-      setErr(
-        e instanceof Error ? e.message : 'Action failed',
-      );
-    } finally {
-      setActionBusy((a) => {
-        const c = { ...a };
-        delete c[r.id];
-        return c;
-      });
-    }
-  }
-
-  async function quickTableReject(r: ReservationOperationsTableItem) {
-    const n = window.prompt('Reason (optional)');
-    if (n === null) return;
-    const t = getToken();
-    if (!t) return;
-    setActionBusy((m) => ({ ...m, [r.id]: true }));
-    try {
-      await updateReservationStatus(
-        t,
-        r.restaurant.id,
-        r.id,
-        'REJECTED',
-        n || undefined,
-      );
-      await load();
-    } catch (e) {
-      setErr(
-        e instanceof Error ? e.message : 'Action failed',
-      );
-    } finally {
-      setActionBusy((a) => {
-        const c = { ...a };
-        delete c[r.id];
-        return c;
-      });
-    }
-  }
-
-  async function quickEventConfirm(
-    r: ReservationOperationsEventItem,
-  ) {
-    if (!window.confirm('Confirm this event booking?')) return;
-    const t = getToken();
-    if (!t) return;
-    setActionBusy((m) => ({ ...m, [r.id]: true }));
-    try {
-      await updateEventReservationStatus(t, r.restaurant.id, r.id, {
-        status: 'CONFIRMED',
-      });
-      await load();
-    } catch (e) {
-      setErr(
-        e instanceof Error ? e.message : 'Not enough capacity or other rule',
-      );
-    } finally {
-      setActionBusy((a) => {
-        const c = { ...a };
-        delete c[r.id];
-        return c;
-      });
-    }
-  }
-  async function quickEventReject(r: ReservationOperationsEventItem) {
-    const n = window.prompt('Rejection reason (optional)');
-    if (n === null) return;
-    const t = getToken();
-    if (!t) return;
-    setActionBusy((m) => ({ ...m, [r.id]: true }));
-    try {
-      await updateEventReservationStatus(t, r.restaurant.id, r.id, {
-        status: 'REJECTED',
-        rejectionReason: n || undefined,
-      });
-      await load();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Failed');
-    } finally {
-      setActionBusy((a) => {
-        const c = { ...a };
-        delete c[r.id];
-        return c;
-      });
-    }
-  }
+  const isStaff = me && (me.role === 'RESTAURANT_ADMIN' || me.role === 'PLATFORM_ADMIN');
 
   if (loading) {
-    return <p className="text-sm text-zinc-600">Loading…</p>;
+    return <p className="text-sm text-zinc-600 dark:text-zinc-400">Loading…</p>;
   }
   if (err) {
-    return (
-      <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-        {err}
-      </div>
-    );
+    return <AdminErrorState>{err}</AdminErrorState>;
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <AdminPageHeader
-          title="Dashboard"
-          description={
-            isStaff
-              ? 'Counts and the next actions to open in other screens.'
-              : undefined
-          }
-        />
-        {isStaff && (
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            <Link
-              href={pendingBookingsPath()}
-              className="font-medium text-zinc-800 underline dark:text-zinc-200"
-            >
-              Pending work
-            </Link>
-            {' · '}
-            <Link
-              className="font-medium text-zinc-800 underline dark:text-zinc-200"
-              href="/dashboard/notifications"
-            >
-              Notifications
-            </Link>
-            {unread > 0 ? ` (${unread} unread)` : ''}
-          </p>
-        )}
-      </div>
+    <div className="space-y-8">
+      <AdminPageHeader
+        title="Dashboard"
+        description="Overview of restaurants, restaurant table bookings, and event nights in your scope."
+      />
 
-      {isStaff && (
-        <div>
+      {isStaff ? (
+        <section>
           <h2 className="mb-2 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-            At a glance
+            Summary
           </h2>
-          {!ops ? (
-            <p className="text-xs text-amber-800/90 dark:text-amber-200/90">
-              The work queue could not be loaded. Booking counts may be zero until it is
-              available.
-            </p>
-          ) : null}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-            <Counter label="Restaurants" value={restaurants.length} />
-            <Counter
+            <StatCard
+              label="Restaurants"
+              value={restaurants.length}
+              href="/dashboard/restaurants"
+            />
+            <StatCard
+              label="Restaurant bookings"
+              value={stats.totalBookings}
+              sub="all statuses"
+              href="/dashboard/bookings/restaurants"
+            />
+            <StatCard
+              label="Pending (tables)"
+              value={stats.pending}
+              href="/dashboard/bookings/restaurants"
+            />
+            <StatCard
+              label="Cancelled (tables)"
+              value={stats.cancelled}
+              href="/dashboard/bookings/restaurants"
+            />
+            <StatCard
               label="Event nights"
-              value={allEvents.length}
+              value={eventNights.length}
+              href="/dashboard/events"
             />
-            <Counter
-              label="Pending event approvals"
-              value={pendingNights.length}
-            />
-            <Counter
-              label="Upcoming (approved)"
-              value={approvedUpcoming.length}
-            />
-            <Counter
-              label="Pending restaurant bookings"
-              value={ops?.summary.pendingTableCount ?? 0}
-            />
-            <Counter
-              label="Pending event bookings"
-              value={ops?.summary.pendingEventCount ?? 0}
-            />
-            {isPa ? (
-              <Counter
-                label="Users"
-                value={totalUsers ?? '—'}
-                sub="all roles"
-              />
-            ) : null}
-            <Counter label="Unread" value={unread} sub="notifications" />
           </div>
-        </div>
-      )}
-
-      {!isStaff && (
-        <p className="text-sm text-zinc-600">
-          Use the apps you have access to from the menu.
+        </section>
+      ) : (
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          Use the menu to open the sections you have access to.
         </p>
       )}
 
-      {isPa && recentUsers && recentUsers.length > 0 && (
-        <div className="rounded-lg border border-zinc-200 bg-white p-3">
-          <div className="text-sm font-medium text-zinc-900">Recent sign-ups</div>
-          <ul className="mt-1 text-xs text-zinc-600">
-            {recentUsers.map((u) => (
-              <li key={u.id}>
-                {u.email} — {u.role} — {fmt(u.createdAt)}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {isStaff && isPa && nightSlice.length > 0 && (
-        <div>
-          <h2 className="mb-2 text-sm font-semibold text-zinc-800">
-            Event nights awaiting approval
-          </h2>
-          <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white text-sm">
-            <table className="min-w-full text-left text-xs sm:text-sm">
-              <thead className="bg-zinc-50 text-zinc-500">
-                <tr>
-                  <th className="px-2 py-1.5">Event</th>
-                  <th className="px-2 py-1.5">Venue</th>
-                  <th className="px-2 py-1.5">When</th>
-                  <th className="px-2 py-1.5" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {nightSlice.map((ev) => (
-                  <tr key={ev.id}>
-                    <td className="px-2 py-1.5 text-zinc-800">{ev.title}</td>
-                    <td className="px-2 py-1.5">
-                      {restName(restaurants, ev.restaurantId)}
-                    </td>
-                    <td className="px-2 py-1.5 text-zinc-600">
-                      {fmt(ev.startsAt)}
-                    </td>
-                    <td className="px-2 py-1.5 text-right">
-                      {isPa ? (
-                        <div className="inline-flex flex-wrap justify-end gap-1">
-                          <Button
-                            variant="secondary"
-                            className="!px-1.5 !py-0.5 !text-xs"
-                            type="button"
-                            disabled={actionBusy[ev.id]}
-                            onClick={() => onApproveEventNight(ev)}
-                          >
-                            Approve
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            className="!px-1.5 !py-0.5 !text-xs"
-                            type="button"
-                            disabled={actionBusy[ev.id]}
-                            onClick={() => onRejectEventNight(ev)}
-                          >
-                            Reject
-                          </Button>
-                        </div>
-                      ) : null}
-                      <Link
-                        className="ml-1 text-zinc-600 underline"
-                        href={`/dashboard/restaurants/${ev.restaurantId}/events`}
-                      >
-                        Venue
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {isStaff && latestTable.length > 0 ? (
+        <section>
+          <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+            <h2 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+              Latest restaurant bookings
+            </h2>
+            <Link
+              className="text-xs font-medium text-amber-800 underline dark:text-amber-300/90"
+              href="/dashboard/bookings/restaurants"
+            >
+              View all
+            </Link>
           </div>
-        </div>
-      )}
-
-      {isStaff && !isPa && pendingNights.length > 0 && (
-        <p className="rounded border border-amber-100 bg-amber-50/50 px-3 py-2 text-sm text-amber-950/90">
-          {pendingNights.length} event night{pendingNights.length === 1 ? '' : 's'}{' '}
-          await platform review.{' '}
-          <Link className="font-medium underline" href="/dashboard/events">
-            View event nights
-          </Link>
-        </p>
-      )}
-
-      {isStaff && tSlice.length > 0 && (
-        <div>
-          <h2 className="mb-2 text-sm font-semibold text-zinc-800">
-            Restaurant bookings to review
-          </h2>
-          <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white text-sm">
+          <div className="overflow-x-auto rounded-lg border border-zinc-200/90 bg-white text-sm dark:border-zinc-700/80 dark:bg-zinc-900/70">
             <table className="min-w-full text-left text-xs sm:text-sm">
-              <thead className="bg-zinc-50 text-zinc-500">
+              <thead className="bg-zinc-50 text-zinc-500 dark:bg-zinc-800/80 dark:text-zinc-400">
                 <tr>
-                  <th className="px-2 py-1.5">ID</th>
-                  <th className="px-2 py-1.5">Venue</th>
-                  <th className="px-2 py-1.5">Guest / party</th>
-                  <th className="px-2 py-1.5">Time</th>
-                  <th className="px-2 py-1.5" />
+                  <th className="px-3 py-2">When</th>
+                  <th className="px-3 py-2">Restaurant</th>
+                  <th className="px-3 py-2">Guest</th>
+                  <th className="px-3 py-2">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {tSlice.map((r) => (
-                  <tr key={r.id}>
-                    <td className="px-2 py-1.5 font-mono text-[10px] text-zinc-500">
-                      {r.id.slice(0, 8)}…
-                    </td>
-                    <td className="px-2 py-1.5">{r.restaurant.name}</td>
-                    <td className="px-2 py-1.5">
-                      {r.customer.fullName} · {r.partySize}
-                    </td>
-                    <td className="px-2 py-1.5 text-zinc-600">
+              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-700/80">
+                {latestTable.map((r) => (
+                  <tr key={r.id} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40">
+                    <td className="px-3 py-2 text-zinc-600 dark:text-zinc-300">
                       {fmt(r.startAt)}
                     </td>
-                    <td className="px-2 py-1.5 text-right">
-                      <div className="inline-flex flex-wrap items-center justify-end gap-1">
-                        <Button
-                          variant="secondary"
-                          className="!px-1.5 !py-0.5 !text-xs"
-                          type="button"
-                          disabled={!!actionBusy[r.id]}
-                          onClick={() => quickTableConfirm(r)}
-                        >
-                          OK
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          className="!px-1.5 !py-0.5 !text-xs"
-                          type="button"
-                          disabled={!!actionBusy[r.id]}
-                          onClick={() => quickTableReject(r)}
-                        >
-                          Reject
-                        </Button>
-                        <Link
-                          className="text-zinc-700 underline"
-                          href={globalTableReservationsPath({
-                            restaurantId: r.restaurant.id,
-                            reservationId: r.id,
-                          })}
-                        >
-                          Open
-                        </Link>
-                      </div>
+                    <td className="px-3 py-2 text-zinc-800 dark:text-zinc-100">
+                      {r.restaurant.name}
                     </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {isStaff && eBookSlice.length > 0 && (
-        <div>
-          <h2 className="mb-2 text-sm font-semibold text-zinc-800">
-            Event bookings to review
-          </h2>
-          <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white text-sm">
-            <table className="min-w-full text-left text-xs sm:text-sm">
-              <thead className="bg-zinc-50 text-zinc-500">
-                <tr>
-                  <th className="px-2 py-1.5">ID / event</th>
-                  <th className="px-2 py-1.5">Venue</th>
-                  <th className="px-2 py-1.5">Guest / party</th>
-                  <th className="px-2 py-1.5" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {eBookSlice.map((r) => (
-                  <tr key={r.id}>
-                    <td className="px-2 py-1.5">
-                      <div className="text-[10px] text-zinc-500">
-                        {r.id.slice(0, 8)}…
-                      </div>
-                      <div className="text-zinc-800">{r.eventTitle}</div>
-                    </td>
-                    <td className="px-2 py-1.5">{r.restaurant.name}</td>
-                    <td className="px-2 py-1.5">
+                    <td className="px-3 py-2">
                       {r.customer.fullName} · {r.partySize}
                     </td>
-                    <td className="px-2 py-1.5 text-right">
-                      <div className="inline-flex flex-wrap items-center justify-end gap-1">
-                        <Button
-                          variant="secondary"
-                          className="!px-1.5 !py-0.5 !text-xs"
-                          type="button"
-                          disabled={!!actionBusy[r.id]}
-                          onClick={() => quickEventConfirm(r)}
-                        >
-                          OK
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          className="!px-1.5 !py-0.5 !text-xs"
-                          type="button"
-                          disabled={!!actionBusy[r.id]}
-                          onClick={() => quickEventReject(r)}
-                        >
-                          Reject
-                        </Button>
-                        <Link
-                          className="text-zinc-700 underline"
-                          href={globalEventReservationsPath({
-                            restaurantId: r.restaurant.id,
-                            eventId: r.eventId,
-                            eventReservationId: r.id,
-                          })}
-                        >
-                          Open
-                        </Link>
-                      </div>
+                    <td className="px-3 py-2">
+                      <AdminStatusBadge tone={rsvTone(r.status)}>
+                        {r.status}
+                      </AdminStatusBadge>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+          <p className="mt-1.5 text-[11px] text-zinc-500 dark:text-zinc-500">
+            <Link
+              className="underline"
+              href="/dashboard/bookings/restaurants"
+            >
+              Open restaurant bookings
+            </Link>{' '}
+            to confirm, reject, or change status. Event-night marketing events are
+            under Event nights.
+          </p>
+        </section>
+      ) : null}
 
+      {isStaff && latestNights.length > 0 ? (
+        <section>
+          <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+            <h2 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+              Latest event nights
+            </h2>
+            <Link
+              className="text-xs font-medium text-amber-800 underline dark:text-amber-300/90"
+              href="/dashboard/events"
+            >
+              View all
+            </Link>
+          </div>
+          <div className="overflow-x-auto rounded-lg border border-zinc-200/90 bg-white text-sm dark:border-zinc-700/80 dark:bg-zinc-900/70">
+            <table className="min-w-full text-left text-xs sm:text-sm">
+              <thead className="bg-zinc-50 text-zinc-500 dark:bg-zinc-800/80 dark:text-zinc-400">
+                <tr>
+                  <th className="px-3 py-2">Starts</th>
+                  <th className="px-3 py-2">Title</th>
+                  <th className="px-3 py-2">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-700/80">
+                {latestNights.map((e) => (
+                  <tr key={e.id} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40">
+                    <td className="px-3 py-2 text-zinc-600 dark:text-zinc-300">
+                      {fmt(e.startsAt)}
+                    </td>
+                    <td className="px-3 py-2 text-zinc-800 dark:text-zinc-100">
+                      {e.title}
+                    </td>
+                    <td className="px-3 py-2">
+                      <AdminStatusBadge
+                        tone={
+                          e.status === 'PENDING'
+                            ? 'yellow'
+                            : e.status === 'APPROVED'
+                              ? 'green'
+                              : 'zinc'
+                        }
+                      >
+                        {e.status}
+                      </AdminStatusBadge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

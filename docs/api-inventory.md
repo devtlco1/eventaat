@@ -4,7 +4,7 @@
 **OpenAPI JSON:** [http://localhost:4000/docs-json](http://localhost:4000/docs-json) (with API running)  
 **Handwritten reference (detail):** [api-reference.md](api-reference.md)
 
-| Total endpoints | 57 |
+| Total endpoints | 58 |
 |-----------------|----|
 
 ## Count by module (domain)
@@ -15,7 +15,7 @@
 | `auth` | 4 | Register, login, session, admin smoke test |
 | `users` | 3 | Platform user directory and updates |
 | `me` | 12 | Account profile + password, reservations (customer) + in-app `notifications` + `reservation-operations` (staff) |
-| `restaurants` | 37 | Restaurants CRUD, ops, events, both reservation types, tables, assignments |
+| `restaurants` | 38 | Restaurants CRUD, ops, events, both reservation types, tables, assignments |
 
 The `restaurants` controller (single Nest `@Controller('restaurants')`) is split below by domain for clarity. Paths still live under `/restaurants/...`.
 
@@ -28,8 +28,8 @@ The `restaurants` controller (single Nest `@Controller('restaurants')`) is split
 | Event reservations | 4 |
 | Admin assignments | 3 |
 | Tables | 4 |
-| Table reservations | 5 |
-| *Subtotal* | *37* |
+| Table reservations | 6 |
+| *Subtotal* | *38* |
 
 ---
 
@@ -92,6 +92,7 @@ All paths are relative to the base URL. Unless noted, JSON request bodies follow
 | GET | `/restaurants/:restaurantId/tables/:tableId` | tables | Bearer | any | implemented | Customer: inactive table → 404 |
 | PATCH | `/restaurants/:restaurantId/tables/:tableId` | tables | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | |
 | POST | `/restaurants/:restaurantId/reservations` | table reservations | Bearer | CUSTOMER | implemented | **Table** booking request (optional `tableId`) |
+| POST | `/restaurants/:restaurantId/reservations/admin` | table reservations | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | Staff create for a **CUSTOMER** user id; **PENDING**; same response shape as admin list |
 | GET | `/restaurants/:restaurantId/reservations` | table reservations | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | R-A: assigned only; responses include `type: TABLE`, `statusHistory` |
 | GET | `/restaurants/:restaurantId/reservations/:reservationId` | table reservations | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | Full detail; same shape as list item |
 | GET | `/restaurants/:restaurantId/reservations/:reservationId/history` | table reservations | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | Table status history only (list/detail also embed the same) |

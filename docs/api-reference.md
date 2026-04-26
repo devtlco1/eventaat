@@ -404,6 +404,7 @@ The assigned user is expected to have role `RESTAURANT_ADMIN` (enforced in servi
 | Method | Path | Roles | Notes |
 |--------|------|-------|--------|
 | `POST` | `…/reservations` | **CUSTOMER** | `CreateReservationDto` — **PENDING** table request (optional `tableId`); **200** body includes `type: "TABLE"` and embedded `statusHistory` |
+| `POST` | `…/reservations/admin` | `PLATFORM_ADMIN`, `RESTAURANT_ADMIN` (assigned) | `CreateAdminTableReservationDto` — create **PENDING** on behalf of a **CUSTOMER** `customerId` (body: `partySize`, `startAt`, `endAt`, optional `specialRequest`, `tableId`, optional `guestType` / `seatingPreference` / `bookingType`); first history note: staff-created. **200:** same `AdminTableReservationResponse` as list row |
 | `GET` | `…/reservations` | `PLATFORM_ADMIN`, `RESTAURANT_ADMIN` (assigned) | All requests — each: `type: "TABLE"`, `customer`, `restaurant`, `statusHistory` oldest→newest |
 | `GET` | `…/reservations/:reservationId` | `PLATFORM_ADMIN`, `RESTAURANT_ADMIN` (assigned) | Single table reservation for that restaurant; **404** if not found for restaurant |
 | `GET` | `…/reservations/:reservationId/history` | `PLATFORM_ADMIN`, `RESTAURANT_ADMIN` (assigned) | Status change entries only (same information is also embedded in list/detail reservation objects) |

@@ -26,9 +26,9 @@ export function globalEventReservationsPath(q?: {
   return `/dashboard/bookings/events${s ? `?${s}` : ''}`;
 }
 
-/** Combined daily queue (table + event pending + recent). */
+/** @deprecated — legacy “pending work” list; use dashboard + booking pages. */
 export function pendingBookingsPath(): string {
-  return '/dashboard/bookings/pending';
+  return '/dashboard';
 }
 
 /** Per-restaurant table list; bookmark and legacy deep links. */
@@ -62,6 +62,30 @@ export function getNotificationAdminPath(
   n: InAppNotification,
 ): { path: string } | null {
   const restId = n.restaurantId;
+
+  if (n.entityType === 'EVENT') {
+    const eid = n.eventId ?? n.entityId;
+    if (!eid) return null;
+    const p = new URLSearchParams();
+    p.set('eventId', eid);
+    if (restId) p.set('restaurantId', restId);
+    return { path: `/dashboard/events?${p.toString()}` };
+  }
+
+  if (n.entityType === 'RESTAURANT' && restId) {
+    const p = new URLSearchParams();
+    p.set('restaurantId', restId);
+    return { path: `/dashboard/restaurants?${p.toString()}` };
+  }
+
+  if (n.entityType === 'TABLE_RESERVATION' && !restId) {
+    const rid = n.reservationId ?? n.entityId;
+    if (rid) {
+      return { path: `/dashboard/bookings/restaurants?reservationId=${encodeURIComponent(rid)}` };
+    }
+    return null;
+  }
+
   if (!restId) return null;
 
   if (n.entityType === 'TABLE_RESERVATION') {

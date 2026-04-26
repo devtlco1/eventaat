@@ -7,22 +7,29 @@ import { AdminEmptyState } from '../../../../components/admin/AdminEmptyState';
 import { AdminErrorState } from '../../../../components/admin/AdminErrorState';
 import { AdminPageHeader } from '../../../../components/admin/AdminPageHeader';
 import { AdminStatusBadge } from '../../../../components/admin/AdminStatusBadge';
+import { AdminPaginationBar } from '../../../../components/AdminPaginationBar';
 import { Button } from '../../../../components/Button';
+import { Input } from '../../../../components/Input';
+import { Modal } from '../../../../components/Modal';
 import {
+  createAdminTableReservation,
   getMe,
+  listUsers,
   type AdminReservationStatus,
   type MeResponse,
+  type PlatformUser,
   type ReservationStatus,
   type Restaurant,
   type RestaurantReservation,
   updateReservationStatus,
 } from '../../../../lib/api';
 import { getToken } from '../../../../lib/auth';
+import { loadAllAccessibleTableReservations } from '../../../../lib/staffReservationsData';
+import { useClientPagination } from '../../../../lib/useClientPagination';
 import {
   globalTableReservationsPath,
   perRestaurantTableReservationsPath,
 } from '../../../../lib/reservationLinks';
-import { loadAllAccessibleTableReservations } from '../../../../lib/staffReservationsData';
 
 const STATUS_FILTER: (ReservationStatus | 'ALL')[] = [
   'ALL',
@@ -60,6 +67,16 @@ function fmt(dt: string) {
   return isNaN(d.getTime()) ? dt : d.toLocaleString();
 }
 
+function includesCustomer(r: RestaurantReservation, q: string) {
+  const t = q.trim().toLowerCase();
+  if (!t) return true;
+  return (
+    r.customer.fullName.toLowerCase().includes(t) ||
+    r.customer.email.toLowerCase().includes(t) ||
+    (r.customer.phone && r.customer.phone.toLowerCase().includes(t))
+  );
+}
+
 export default function GlobalTableReservationsPage() {
   const sp = useSearchParams();
   const highlightReservationId = sp.get('reservationId')?.trim() || undefined;
@@ -73,9 +90,27 @@ export default function GlobalTableReservationsPage() {
   const [updating, setUpdating] = useState<Record<string, boolean>>({});
   const [restFilter, setRestFilter] = useState<string>(qRest || 'ALL');
   const [statusFilter, setStatusFilter] = useState<ReservationStatus | 'ALL'>('ALL');
+  const [customerQ, setCustomerQ] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [partyMax, setPartyMax] = useState('');
   const [missingHighlight, setMissingHighlight] = useState(false);
   const deepLinkTuned = useRef(false);
 
+  const [addOpen, setAddOpen] = useState(false);
+  const [addErr, setAddErr] = useState<string | null>(null);
+  const [addBusy, setAddBusy] = useState(false);
+  const [customerPick, setCustomerPick] = useState<PlatformUser[]>([]);
+  const [addForm, setAddForm] = useState({
+    restaurantId: '',
+    customerId: '',
+    partySize: 2,
+    startLocal: '',
+    endLocal: '',
+    specialRequest: '',
+  });
+
+  const isPa = me?.role === 'PLATFORM_ADMIN';
   const canManage = me?.role === 'PLATFORM_ADMIN' || me?.role === 'RESTAURANT_ADMIN';
 
   const refresh = useCallback(async () => {
@@ -109,12 +144,27 @@ export default function GlobalTableReservationsPage() {
   }, [refresh]);
 
   const filtered = useMemo(() => {
+    const pMax = partyMax.trim() ? Number(partyMax) : NaN;
+    const fromT = dateFrom ? new Date(`${dateFrom}T00:00:00`) : null;
+    const toT = dateTo ? new Date(`${dateTo}T23:59:59.999`) : null;
     return reservations.filter((r) => {
       if (statusFilter !== 'ALL' && r.status !== statusFilter) return false;
       if (restFilter !== 'ALL' && r.restaurant.id !== restFilter) return false;
+      if (!includesCustomer(r, customerQ)) return false;
+      const st = new Date(r.startAt);
+      if (fromT && !isNaN(fromT.getTime()) && st < fromT) return false;
+      if (toT && !isNaN(toT.getTime()) && st > toT) return false;
+      if (Number.isFinite(pMax) && pMax > 0 && r.partySize > pMax) return false;
       return true;
     });
-  }, [reservations, restFilter, statusFilter]);
+  }, [reservations, restFilter, statusFilter, customerQ, dateFrom, dateTo, partyMax]);
+
+  const { page, setPage, setPageSize, pageCount, paged, total, pageSize } =
+    useClientPagination(filtered);
+
+  useEffect(() => {
+    if (highlightReservationId) setPage(1);
+  }, [highlightReservationId, setPage]);
 
   useEffect(() => {
     if (loading || !reservations.length) return;
@@ -143,7 +193,21 @@ export default function GlobalTableReservationsPage() {
         ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }, 150);
     return () => clearTimeout(t);
-  }, [loading, highlightReservationId, filtered.length, reservations.length]);
+  }, [loading, highlightReservationId, paged.length, page]);
+
+  useEffect(() => {
+    if (!addOpen || !isPa) return;
+    const token = getToken();
+    if (!token) return;
+    void (async () => {
+      try {
+        const list = await listUsers(token, { role: 'CUSTOMER' });
+        setCustomerPick(list);
+      } catch {
+        setCustomerPick([]);
+      }
+    })();
+  }, [addOpen, isPa]);
 
   async function setStatus(
     restaurantId: string,
@@ -190,21 +254,59 @@ export default function GlobalTableReservationsPage() {
     void setStatus(restaurantId, reservationId, 'REJECTED', note || undefined);
   }
 
+  function openAdd() {
+    setAddErr(null);
+    setAddForm((f) => ({
+      ...f,
+      restaurantId: restaurants[0]?.id ?? '',
+      customerId: '',
+      partySize: 2,
+      startLocal: '',
+      endLocal: '',
+      specialRequest: '',
+    }));
+    setAddOpen(true);
+  }
+
+  async function submitAdd() {
+    const token = getToken();
+    if (!token || !canManage) return;
+    setAddErr(null);
+    if (!addForm.restaurantId || !addForm.customerId.trim()) {
+      setAddErr('Choose a restaurant and customer (user id).');
+      return;
+    }
+    if (!addForm.startLocal || !addForm.endLocal) {
+      setAddErr('Start and end date/time are required.');
+      return;
+    }
+    const startAt = new Date(addForm.startLocal).toISOString();
+    const endAt = new Date(addForm.endLocal).toISOString();
+    setAddBusy(true);
+    try {
+      await createAdminTableReservation(token, addForm.restaurantId, {
+        customerId: addForm.customerId.trim(),
+        partySize: addForm.partySize,
+        startAt,
+        endAt,
+        specialRequest: addForm.specialRequest.trim() || undefined,
+      });
+      setAddOpen(false);
+      await refresh();
+    } catch (e) {
+      setAddErr(
+        e instanceof Error ? e.message : 'Could not create booking. Check times and id.',
+      );
+    } finally {
+      setAddBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <AdminPageHeader
         title="Restaurant bookings"
-        description="Table and seating-time booking requests. Guest lists for an event night are in Event bookings."
-        extra={
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-500">
-            <Link
-              href="/dashboard/bookings/events"
-              className="font-medium text-zinc-800 underline dark:text-amber-200/90"
-            >
-              Open Event bookings
-            </Link>
-          </p>
-        }
+        description="Table and seating-time reservations only. Event-night guest tickets stay on the separate event flow in the app."
       />
 
       {error ? <AdminErrorState>{error}</AdminErrorState> : null}
@@ -262,200 +364,393 @@ export default function GlobalTableReservationsPage() {
             ))}
           </select>
         </label>
+        <label className="text-sm text-zinc-700 dark:text-zinc-200">
+          <span className="mr-2 block sm:inline">From date</span>
+          <input
+            type="date"
+            className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+          />
+        </label>
+        <label className="text-sm text-zinc-700 dark:text-zinc-200">
+          <span className="mr-2 block sm:inline">To date</span>
+          <input
+            type="date"
+            className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+          />
+        </label>
+        <div className="w-full min-w-[12rem] sm:max-w-xs sm:flex-1">
+          <Input
+            label="Customer (name, email, phone)"
+            value={customerQ}
+            onChange={(e) => setCustomerQ(e.target.value)}
+            placeholder="Filter…"
+          />
+        </div>
+        <div className="w-20">
+          <Input
+            label="Max party"
+            value={partyMax}
+            onChange={(e) => setPartyMax(e.target.value)}
+            placeholder="—"
+          />
+        </div>
+        {canManage ? (
+          <Button type="button" onClick={openAdd}>
+            Add booking
+          </Button>
+        ) : null}
         <Button type="button" variant="secondary" onClick={refresh}>
           Refresh
         </Button>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/60">
-        <table className="min-w-full text-left text-sm">
-          <thead className="bg-zinc-50 text-xs uppercase text-zinc-500 dark:bg-zinc-800/80 dark:text-zinc-400">
-            <tr>
-              <th className="px-3 py-2">Type / ID</th>
-              <th className="px-3 py-2">Restaurant</th>
-              <th className="px-3 py-2">Customer</th>
-              <th className="px-3 py-2">Party</th>
-              <th className="px-3 py-2">Window</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Note / reason</th>
-              <th className="px-3 py-2">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-200">
-            {loading ? (
+      <p className="text-[11px] text-zinc-500 dark:text-zinc-500">
+        List paging is in the browser (default 20 rows). Server-side pagination
+        is a future improvement.
+      </p>
+
+      <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/60">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="bg-zinc-50 text-xs uppercase text-zinc-500 dark:bg-zinc-800/80 dark:text-zinc-400">
               <tr>
-                <td className="px-3 py-4 text-zinc-600 dark:text-zinc-400" colSpan={8}>
-                  Loading…
-                </td>
+                <th className="px-3 py-2">Type / ID</th>
+                <th className="px-3 py-2">Restaurant</th>
+                <th className="px-3 py-2">Customer</th>
+                <th className="px-3 py-2">Party</th>
+                <th className="px-3 py-2">Window</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Note / reason</th>
+                <th className="px-3 py-2">Actions</th>
               </tr>
-            ) : filtered.length === 0 ? (
-              <tr>
-                <td className="px-3 py-4" colSpan={8}>
-                  <AdminEmptyState>No bookings match the filters.</AdminEmptyState>
-                </td>
-              </tr>
-            ) : (
-              filtered.map((r) => {
-                const busy = !!updating[r.id];
-                const terminal =
-                  r.status === 'CANCELLED' ||
-                  r.status === 'COMPLETED' ||
-                  r.status === 'REJECTED';
-                const canCancelThis =
-                  r.status === 'PENDING' ||
-                  r.status === 'HELD' ||
-                  r.status === 'CONFIRMED';
-                const disableActions = !canManage || busy || terminal;
-                const history = r.statusHistory ?? [];
-                return (
-                  <Fragment key={r.id}>
-                    <tr
-                      id={`admin-table-resv-${r.id}`}
-                      className={
-                        highlightReservationId === r.id
-                          ? 'bg-amber-50/70 ring-1 ring-amber-300 dark:bg-amber-950/30 dark:ring-amber-700/60'
-                          : 'hover:bg-zinc-50/80 dark:hover:bg-zinc-800/50'
-                      }
-                    >
-                      <td className="px-3 py-2 align-top text-xs">
-                        <span className="font-semibold text-zinc-800 dark:text-zinc-200">
-                          TABLE
-                        </span>
-                        <div className="mt-0.5 break-all text-[10px] text-zinc-500">
-                          {r.id}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 align-top text-zinc-800">
-                        {r.restaurant.name}
-                        <div>
-                          <Link
-                            className="text-xs text-zinc-600 underline"
-                            href={perRestaurantTableReservationsPath(
-                              r.restaurantId,
-                            )}
-                          >
-                            Venue list
-                          </Link>
-                        </div>
-                        <div>
-                          <Link
-                            className="text-xs text-zinc-500 underline"
-                            href={globalTableReservationsPath({
-                              restaurantId: r.restaurantId,
-                              reservationId: r.id,
-                            })}
-                          >
-                            Link
-                          </Link>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 align-top">
-                        <div className="text-zinc-900">{r.customer.fullName}</div>
-                        <div className="text-xs text-zinc-500">
-                          {r.customer.email}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2">{r.partySize}</td>
-                      <td className="px-3 py-2 text-xs text-zinc-700">
-                        {fmt(r.startAt)} — {fmt(r.endAt)}
-                      </td>
-                      <td className="px-3 py-2">
-                        <AdminStatusBadge tone={statusTone(r.status)}>
-                          {r.status}
-                        </AdminStatusBadge>
-                      </td>
-                      <td className="max-w-[12rem] px-3 py-2 text-xs text-zinc-600">
-                        {r.note || r.specialRequest || '—'}
-                        {r.rejectionReason ? (
-                          <div className="mt-0.5 text-amber-900/90">
-                            Reject: {r.rejectionReason}
+            </thead>
+            <tbody className="divide-y divide-zinc-200">
+              {loading ? (
+                <tr>
+                  <td
+                    className="px-3 py-4 text-zinc-600 dark:text-zinc-400"
+                    colSpan={8}
+                  >
+                    Loading…
+                  </td>
+                </tr>
+              ) : paged.length === 0 ? (
+                <tr>
+                  <td className="px-3 py-4" colSpan={8}>
+                    <AdminEmptyState>
+                      {filtered.length === 0
+                        ? 'No bookings match the filters.'
+                        : 'No rows on this page.'}
+                    </AdminEmptyState>
+                  </td>
+                </tr>
+              ) : (
+                paged.map((r) => {
+                  const busy = !!updating[r.id];
+                  const terminal =
+                    r.status === 'CANCELLED' ||
+                    r.status === 'COMPLETED' ||
+                    r.status === 'REJECTED';
+                  const canCancelThis =
+                    r.status === 'PENDING' ||
+                    r.status === 'HELD' ||
+                    r.status === 'CONFIRMED';
+                  const disableActions = !canManage || busy || terminal;
+                  const history = r.statusHistory ?? [];
+                  return (
+                    <Fragment key={r.id}>
+                      <tr
+                        id={`admin-table-resv-${r.id}`}
+                        className={
+                          highlightReservationId === r.id
+                            ? 'bg-amber-50/70 ring-1 ring-amber-300 dark:bg-amber-950/30 dark:ring-amber-700/60'
+                            : 'hover:bg-zinc-50/80 dark:hover:bg-zinc-800/50'
+                        }
+                      >
+                        <td className="px-3 py-2 align-top text-xs">
+                          <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                            TABLE
+                          </span>
+                          <div className="mt-0.5 break-all text-[10px] text-zinc-500">
+                            {r.id}
                           </div>
-                        ) : null}
-                        {r.cancellationReason ? (
-                          <div className="text-zinc-500">
-                            Cancel: {r.cancellationReason}
+                        </td>
+                        <td className="px-3 py-2 align-top text-zinc-800">
+                          {r.restaurant.name}
+                          <div>
+                            <Link
+                              className="text-xs text-zinc-600 underline"
+                              href={perRestaurantTableReservationsPath(r.restaurantId)}
+                            >
+                              Venue list
+                            </Link>
                           </div>
-                        ) : null}
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex max-w-xs flex-col gap-1">
-                          <div className="flex flex-wrap gap-1">
-                            <Button
-                              variant="secondary"
-                              onClick={() => setStatus(r.restaurantId, r.id, 'HELD')}
-                              disabled={disableActions || r.status !== 'PENDING'}
+                          <div>
+                            <Link
+                              className="text-xs text-zinc-500 underline"
+                              href={globalTableReservationsPath({
+                                restaurantId: r.restaurantId,
+                                reservationId: r.id,
+                              })}
                             >
-                              Hold
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              onClick={() =>
-                                setStatus(r.restaurantId, r.id, 'CONFIRMED')
-                              }
-                              disabled={
-                                disableActions ||
-                                (r.status !== 'PENDING' && r.status !== 'HELD')
-                              }
-                            >
-                              Confirm
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              onClick={() => rejectWithPrompt(r.restaurantId, r.id)}
-                              disabled={
-                                disableActions ||
-                                (r.status !== 'PENDING' && r.status !== 'HELD')
-                              }
-                            >
-                              Reject
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              onClick={() => setStatus(r.restaurantId, r.id, 'CANCELLED')}
-                              disabled={disableActions || !canCancelThis}
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              onClick={() =>
-                                setStatus(r.restaurantId, r.id, 'COMPLETED')
-                              }
-                              disabled={disableActions || r.status !== 'CONFIRMED'}
-                            >
-                              Complete
-                            </Button>
+                              Link
+                            </Link>
                           </div>
-                        </div>
-                      </td>
-                    </tr>
-                    {history.length > 0 ? (
-                      <tr className="bg-zinc-50/50">
-                        <td colSpan={8} className="px-3 py-1">
-                          <details>
-                            <summary className="cursor-pointer text-xs text-zinc-600">
-                              History ({history.length})
-                            </summary>
-                            <ul className="mt-1 list-none text-xs text-zinc-500">
-                              {history.map((h) => (
-                                <li key={h.id}>
-                                  {fmt(h.createdAt)}: {h.fromStatus ?? '—'} →{' '}
-                                  {h.toStatus}
-                                  {h.note ? ` · ${h.note}` : ''}
-                                </li>
-                              ))}
-                            </ul>
-                          </details>
+                        </td>
+                        <td className="px-3 py-2 align-top">
+                          <div className="text-zinc-900">{r.customer.fullName}</div>
+                          <div className="text-xs text-zinc-500">
+                            {r.customer.email}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2">{r.partySize}</td>
+                        <td className="px-3 py-2 text-xs text-zinc-700">
+                          {fmt(r.startAt)} — {fmt(r.endAt)}
+                        </td>
+                        <td className="px-3 py-2">
+                          <AdminStatusBadge tone={statusTone(r.status)}>
+                            {r.status}
+                          </AdminStatusBadge>
+                        </td>
+                        <td className="max-w-[12rem] px-3 py-2 text-xs text-zinc-600">
+                          {r.note || r.specialRequest || '—'}
+                          {r.rejectionReason ? (
+                            <div className="mt-0.5 text-amber-900/90">
+                              Reject: {r.rejectionReason}
+                            </div>
+                          ) : null}
+                          {r.cancellationReason ? (
+                            <div className="text-zinc-500">
+                              Cancel: {r.cancellationReason}
+                            </div>
+                          ) : null}
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex max-w-xs flex-col gap-1">
+                            <div className="flex flex-wrap gap-1">
+                              <Button
+                                variant="secondary"
+                                onClick={() =>
+                                  setStatus(r.restaurantId, r.id, 'HELD')
+                                }
+                                disabled={disableActions || r.status !== 'PENDING'}
+                              >
+                                Hold
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                onClick={() =>
+                                  setStatus(r.restaurantId, r.id, 'CONFIRMED')
+                                }
+                                disabled={
+                                  disableActions ||
+                                  (r.status !== 'PENDING' && r.status !== 'HELD')
+                                }
+                              >
+                                Confirm
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                onClick={() =>
+                                  rejectWithPrompt(r.restaurantId, r.id)
+                                }
+                                disabled={
+                                  disableActions ||
+                                  (r.status !== 'PENDING' && r.status !== 'HELD')
+                                }
+                              >
+                                Reject
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                onClick={() =>
+                                  setStatus(r.restaurantId, r.id, 'CANCELLED')
+                                }
+                                disabled={disableActions || !canCancelThis}
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                onClick={() =>
+                                  setStatus(r.restaurantId, r.id, 'COMPLETED')
+                                }
+                                disabled={
+                                  disableActions || r.status !== 'CONFIRMED'
+                                }
+                              >
+                                Complete
+                              </Button>
+                            </div>
+                          </div>
                         </td>
                       </tr>
-                    ) : null}
-                  </Fragment>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                      {history.length > 0 ? (
+                        <tr className="bg-zinc-50/50">
+                          <td colSpan={8} className="px-3 py-1">
+                            <details>
+                              <summary className="cursor-pointer text-xs text-zinc-600">
+                                History ({history.length})
+                              </summary>
+                              <ul className="mt-1 list-none text-xs text-zinc-500">
+                                {history.map((h) => (
+                                  <li key={h.id}>
+                                    {fmt(h.createdAt)}: {h.fromStatus ?? '—'} →{' '}
+                                    {h.toStatus}
+                                    {h.note ? ` · ${h.note}` : ''}
+                                  </li>
+                                ))}
+                              </ul>
+                            </details>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+        <AdminPaginationBar
+          page={page}
+          pageCount={pageCount}
+          pageSize={pageSize}
+          onPageSizeChange={setPageSize}
+          onPrev={() => setPage((p) => Math.max(1, p - 1))}
+          onNext={() => setPage((p) => Math.min(pageCount, p + 1))}
+          total={total}
+        />
       </div>
+
+      <Modal
+        title="Add restaurant booking"
+        open={addOpen}
+        onClose={() => {
+          if (!addBusy) setAddOpen(false);
+        }}
+        footer={
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={addBusy}
+              onClick={() => setAddOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={addBusy}
+              onClick={() => void submitAdd()}
+            >
+              {addBusy ? 'Creating…' : 'Create'}
+            </Button>
+          </div>
+        }
+      >
+        {addErr ? (
+          <p className="mb-2 text-sm text-red-700 dark:text-red-300">{addErr}</p>
+        ) : null}
+        <div className="space-y-3 text-sm">
+          <label className="block text-zinc-700 dark:text-zinc-200">
+            <span className="mb-0.5 block">Restaurant *</span>
+            <select
+              className="w-full rounded border border-zinc-300 bg-white px-2 py-1.5 dark:border-zinc-600 dark:bg-zinc-800"
+              value={addForm.restaurantId}
+              onChange={(e) =>
+                setAddForm((f) => ({ ...f, restaurantId: e.target.value }))
+              }
+            >
+              <option value="">—</option>
+              {restaurants.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {isPa && customerPick.length > 0 ? (
+            <label className="block text-zinc-700 dark:text-zinc-200">
+              <span className="mb-0.5 block">Customer *</span>
+              <select
+                className="w-full max-w-full rounded border border-zinc-300 bg-white px-2 py-1.5 text-xs dark:border-zinc-600 dark:bg-zinc-800"
+                value={addForm.customerId}
+                onChange={(e) =>
+                  setAddForm((f) => ({ ...f, customerId: e.target.value }))
+                }
+              >
+                <option value="">—</option>
+                {customerPick.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.fullName} · {u.email}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <Input
+              label="Customer user id (UUID) *"
+              value={addForm.customerId}
+              onChange={(e) =>
+                setAddForm((f) => ({ ...f, customerId: e.target.value }))
+              }
+              placeholder="Paste customer id from Users → Mobile"
+            />
+          )}
+          <Input
+            label="Party size *"
+            type="number"
+            min={1}
+            value={String(addForm.partySize)}
+            onChange={(e) =>
+              setAddForm((f) => ({
+                ...f,
+                partySize: Math.max(1, Number(e.target.value) || 1),
+              }))
+            }
+          />
+          <label className="block text-zinc-700 dark:text-zinc-200">
+            <span className="mb-0.5 block">Starts (local) *</span>
+            <input
+              type="datetime-local"
+              className="w-full rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800"
+              value={addForm.startLocal}
+              onChange={(e) =>
+                setAddForm((f) => ({ ...f, startLocal: e.target.value }))
+              }
+            />
+          </label>
+          <label className="block text-zinc-700 dark:text-zinc-200">
+            <span className="mb-0.5 block">Ends (local) *</span>
+            <input
+              type="datetime-local"
+              className="w-full rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800"
+              value={addForm.endLocal}
+              onChange={(e) =>
+                setAddForm((f) => ({ ...f, endLocal: e.target.value }))
+              }
+            />
+          </label>
+          <p className="text-[11px] text-zinc-500">
+            End time must be after start (same rules as the customer app). Set both
+            in your local time zone.
+          </p>
+          <div>
+            <Input
+              label="Special request (optional)"
+              value={addForm.specialRequest}
+              onChange={(e) =>
+                setAddForm((f) => ({ ...f, specialRequest: e.target.value }))
+              }
+            />
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '../../../components/Badge';
+import { AdminPaginationBar } from '../../../components/AdminPaginationBar';
 import { Button } from '../../../components/Button';
 import { Input } from '../../../components/Input';
 import { getToken } from '../../../lib/auth';
+import { useClientPagination } from '../../../lib/useClientPagination';
 import {
   getMe,
   listUsers,
@@ -34,7 +36,8 @@ export default function UsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const [roleFilter, setRoleFilter] = useState<UserRole | ''>('');
+  const [tab, setTab] = useState<'system' | 'mobile'>('system');
+  const [q, setQ] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'true' | 'false'>(
     'all',
   );
@@ -78,7 +81,6 @@ export default function UsersPage() {
       return;
     }
     const usersRes = await listUsers(token, {
-      role: roleFilter || undefined,
       isActive: activeFilter === 'all' ? undefined : toBoolFilter(activeFilter),
     });
     setUsers(usersRes);
@@ -117,7 +119,32 @@ export default function UsersPage() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roleFilter, activeFilter]);
+  }, [activeFilter]);
+
+  const forTab = useMemo(() => {
+    if (tab === 'system') {
+      return users.filter((u) => u.role !== 'CUSTOMER');
+    }
+    return users.filter((u) => u.role === 'CUSTOMER');
+  }, [users, tab]);
+
+  const filtered = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    if (!t) return forTab;
+    return forTab.filter(
+      (u) =>
+        u.fullName.toLowerCase().includes(t) ||
+        u.email.toLowerCase().includes(t) ||
+        (u.phone && u.phone.toLowerCase().includes(t)),
+    );
+  }, [forTab, q]);
+
+  const { page, setPage, setPageSize, pageCount, paged, total, pageSize } =
+    useClientPagination(filtered);
+
+  useEffect(() => {
+    setPage(1);
+  }, [tab, setPage]);
 
   const canSave = useMemo(() => {
     return isPlatformAdmin && !!editForm && !submitting && !!editingUser;
@@ -191,67 +218,63 @@ export default function UsersPage() {
       ) : null}
 
       {isPlatformAdmin ? (
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <div className="text-sm font-semibold text-zinc-900">Filters</div>
-            <div className="text-xs text-zinc-500">Role and active status</div>
+        <div className="space-y-4 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/60">
+          <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            Directory
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {(
+              [
+                { id: 'system' as const, label: 'System users' },
+                { id: 'mobile' as const, label: 'Mobile (customers)' },
+              ] as const
+            ).map((b) => (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => {
+                  setTab(b.id);
+                  setPage(1);
+                }}
+                className={[
+                  'rounded-full border px-3 py-1.5 text-xs font-medium',
+                  tab === b.id
+                    ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900'
+                    : 'border-zinc-200 bg-zinc-50 text-zinc-800 hover:bg-zinc-100 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200',
+                ].join(' ')}
+              >
+                {b.label}
+              </button>
+            ))}
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-2 text-sm text-zinc-700">
-              <div className="font-medium">Role</div>
+            <Input
+              label="Search name, email, or phone"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="…"
+            />
+            <div className="flex flex-col gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+              <div className="font-medium">Account active</div>
               <div className="flex flex-wrap items-center gap-2">
                 {(
                   [
-                    { label: 'All', value: '' },
-                    { label: 'CUSTOMER', value: 'CUSTOMER' },
-                    { label: 'RESTAURANT_ADMIN', value: 'RESTAURANT_ADMIN' },
-                    { label: 'PLATFORM_ADMIN', value: 'PLATFORM_ADMIN' },
+                    { label: 'All', value: 'all' as const },
+                    { label: 'Active', value: 'true' as const },
+                    { label: 'Inactive', value: 'false' as const },
                   ] as const
                 ).map((opt) => {
-                  const active = roleFilter === opt.value;
+                  const on = activeFilter === opt.value;
                   return (
                     <button
                       key={opt.label}
                       type="button"
-                      onClick={() => setRoleFilter(opt.value as any)}
+                      onClick={() => setActiveFilter(opt.value)}
                       className={[
                         'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                        active
-                          ? 'border-zinc-900 bg-zinc-900 text-white'
-                          : 'border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50',
-                      ].join(' ')}
-                    >
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2 text-sm text-zinc-700">
-              <div className="font-medium">Active</div>
-              <div className="flex flex-wrap items-center gap-2">
-                {(
-                  [
-                    { label: 'All', value: 'all' },
-                    { label: 'Active', value: 'true' },
-                    { label: 'Inactive', value: 'false' },
-                  ] as const
-                ).map((opt) => {
-                  const active = activeFilter === opt.value;
-                  return (
-                    <button
-                      key={opt.label}
-                      type="button"
-                      onClick={() =>
-                        setActiveFilter(opt.value as 'all' | 'true' | 'false')
-                      }
-                      className={[
-                        'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                        active
-                          ? 'border-zinc-900 bg-zinc-900 text-white'
-                          : 'border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50',
+                        on
+                          ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900'
+                          : 'border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200',
                       ].join(' ')}
                     >
                       {opt.label}
@@ -262,7 +285,6 @@ export default function UsersPage() {
             </div>
           </div>
         </div>
-      </div>
       ) : null}
 
       {editingUser && editForm ? (
@@ -348,16 +370,20 @@ export default function UsersPage() {
 
       {isPlatformAdmin ? (
       <div className="rounded-xl border border-zinc-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between gap-4 border-b border-zinc-200 px-6 py-4">
-          <div className="text-sm font-semibold text-zinc-900">User list</div>
+        <div className="flex items-center justify-between gap-4 border-b border-zinc-200 px-6 py-4 dark:border-zinc-700/80">
+          <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            User list
+          </div>
           <div className="text-xs text-zinc-500">
-            {loading ? 'Loading…' : `${users.length} total`}
+            {loading
+              ? 'Loading…'
+              : `${tab === 'system' ? 'System' : 'Mobile'} · ${total} in view (${users.length} loaded)`}
           </div>
         </div>
 
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500">
+            <thead className="bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500 dark:bg-zinc-800/80 dark:text-zinc-400">
               <tr>
                 <th className="px-6 py-3">Full name</th>
                 <th className="px-6 py-3">Email</th>
@@ -368,34 +394,45 @@ export default function UsersPage() {
                 <th className="px-6 py-3">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-200">
+            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-700/80">
               {loading ? (
                 <tr>
-                  <td className="px-6 py-4 text-zinc-600" colSpan={7}>
+                  <td className="px-6 py-4 text-zinc-600 dark:text-zinc-400" colSpan={7}>
                     Loading users…
                   </td>
                 </tr>
-              ) : users.length === 0 ? (
+              ) : paged.length === 0 ? (
                 <tr>
-                  <td className="px-6 py-4 text-zinc-600" colSpan={7}>
-                    No users found.
+                  <td className="px-6 py-4 text-zinc-600 dark:text-zinc-400" colSpan={7}>
+                    {filtered.length === 0
+                      ? 'No users in this tab.'
+                      : 'No rows on this page.'}
                   </td>
                 </tr>
               ) : (
-                users.map((u) => (
-                  <tr key={u.id} className="hover:bg-zinc-50/50">
-                    <td className="px-6 py-4 font-medium text-zinc-900">
+                paged.map((u) => (
+                  <tr
+                    key={u.id}
+                    className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/40"
+                  >
+                    <td className="px-6 py-4 font-medium text-zinc-900 dark:text-zinc-100">
                       {u.fullName}
                     </td>
-                    <td className="px-6 py-4 text-zinc-700">{u.email}</td>
-                    <td className="px-6 py-4 text-zinc-700">{u.phone ?? '—'}</td>
-                    <td className="px-6 py-4 text-zinc-700">{u.role}</td>
+                    <td className="px-6 py-4 text-zinc-700 dark:text-zinc-300">
+                      {u.email}
+                    </td>
+                    <td className="px-6 py-4 text-zinc-700 dark:text-zinc-300">
+                      {u.phone ?? '—'}
+                    </td>
+                    <td className="px-6 py-4 text-zinc-700 dark:text-zinc-300">
+                      {u.role}
+                    </td>
                     <td className="px-6 py-4">
                       <Badge tone={u.isActive ? 'green' : 'zinc'}>
                         {u.isActive ? 'Active' : 'Inactive'}
                       </Badge>
                     </td>
-                    <td className="px-6 py-4 text-zinc-700">
+                    <td className="px-6 py-4 text-zinc-700 dark:text-zinc-300">
                       {fmt(u.createdAt)}
                     </td>
                     <td className="px-6 py-4">
@@ -416,6 +453,15 @@ export default function UsersPage() {
             </tbody>
           </table>
         </div>
+        <AdminPaginationBar
+          page={page}
+          pageCount={pageCount}
+          pageSize={pageSize}
+          onPageSizeChange={setPageSize}
+          onPrev={() => setPage((p) => Math.max(1, p - 1))}
+          onNext={() => setPage((p) => Math.min(pageCount, p + 1))}
+          total={total}
+        />
       </div>
       ) : null}
     </div>

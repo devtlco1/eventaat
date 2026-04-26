@@ -1,10 +1,11 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AdminEmptyState } from '../../../components/admin/AdminEmptyState';
 import { AdminErrorState } from '../../../components/admin/AdminErrorState';
 import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
+import { AdminPaginationBar } from '../../../components/AdminPaginationBar';
 import { Button } from '../../../components/Button';
 import {
   listMyNotifications,
@@ -13,7 +14,8 @@ import {
   type InAppNotification,
 } from '../../../lib/api';
 import { getToken } from '../../../lib/auth';
-import { getNotificationAdminPath } from '../../../lib/notificationLinks';
+import { getNotificationAdminPath } from '../../../lib/reservationLinks';
+import { useClientPagination } from '../../../lib/useClientPagination';
 
 function fmt(iso: string): string {
   const d = new Date(iso);
@@ -28,6 +30,8 @@ export default function AdminNotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [navErr, setNavErr] = useState<string | null>(null);
+  const [readMode, setReadMode] = useState<'all' | 'unread'>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
 
   const load = useCallback(async () => {
     const token = getToken();
@@ -48,6 +52,27 @@ export default function AdminNotificationsPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const filtered = useMemo(() => {
+    return rows.filter((n) => {
+      if (readMode === 'unread' && n.readAt) return false;
+      if (typeFilter !== 'all' && n.type !== typeFilter) return false;
+      return true;
+    });
+  }, [rows, readMode, typeFilter]);
+
+  const { page, setPage, setPageSize, pageCount, paged, total, pageSize } =
+    useClientPagination(filtered);
+
+  useEffect(() => {
+    setPage(1);
+  }, [readMode, setPage]);
+
+  const typeOptions = useMemo(() => {
+    const s = new Set<string>();
+    rows.forEach((r) => s.add(r.type));
+    return ['all', ...Array.from(s).sort()];
+  }, [rows]);
 
   async function markReadIfNeeded(n: InAppNotification) {
     if (n.readAt) return;
@@ -113,13 +138,48 @@ export default function AdminNotificationsPage() {
           </Button>
         ) : null}
       </div>
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="text-sm text-zinc-800 dark:text-zinc-200">
+          <span className="mr-2">Inbox</span>
+          <select
+            className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800"
+            value={readMode}
+            onChange={(e) =>
+              setReadMode(e.target.value as 'all' | 'unread')
+            }
+          >
+            <option value="all">All</option>
+            <option value="unread">Unread only</option>
+          </select>
+        </label>
+        <label className="text-sm text-zinc-800 dark:text-zinc-200">
+          <span className="mr-2">Type</span>
+          <select
+            className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800"
+            value={typeFilter}
+            onChange={(e) => {
+              setTypeFilter(e.target.value);
+              setPage(1);
+            }}
+          >
+            {typeOptions.map((t) => (
+              <option key={t} value={t}>
+                {t === 'all' ? 'All types' : t}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <p className="text-[11px] text-zinc-500">
+        Loads up to 100 items; extra filtering is in the browser. Paging default 20.
+      </p>
       <ul className="space-y-2">
         {rows.length === 0 && !loading ? (
           <li>
             <AdminEmptyState>No notifications.</AdminEmptyState>
           </li>
         ) : null}
-        {rows.map((n) => {
+        {paged.map((n) => {
           const unread = !n.readAt;
           return (
             <li
@@ -151,6 +211,17 @@ export default function AdminNotificationsPage() {
           );
         })}
       </ul>
+      {filtered.length > 0 ? (
+        <AdminPaginationBar
+          page={page}
+          pageCount={pageCount}
+          pageSize={pageSize}
+          onPageSizeChange={setPageSize}
+          onPrev={() => setPage((p) => Math.max(1, p - 1))}
+          onNext={() => setPage((p) => Math.min(pageCount, p + 1))}
+          total={total}
+        />
+      ) : null}
     </div>
   );
 }

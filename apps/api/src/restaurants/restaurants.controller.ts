@@ -12,14 +12,17 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   Restaurant,
   RestaurantAdmin,
   RestaurantContact,
   RestaurantTable,
 } from '@prisma/client';
-import type { CustomerTableReservationResponse } from './reservation-response.mappers';
+import type {
+  AdminTableReservationResponse,
+  CustomerTableReservationResponse,
+} from './reservation-response.mappers';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -28,6 +31,7 @@ import { SafeUser } from '../users/users.service';
 import { AvailabilityQueryDto } from './dto/availability-query.dto';
 import { AssignAdminDto } from './dto/assign-admin.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
+import { CreateAdminTableReservationDto } from './dto/create-admin-table-reservation.dto';
 import { CreateRestaurantDto } from './dto/create-restaurant.dto';
 import { CreateRestaurantTableDto } from './dto/create-restaurant-table.dto';
 import { CreateRestaurantContactDto } from './dto/create-restaurant-contact.dto';
@@ -459,6 +463,25 @@ export class RestaurantsController {
   }
 
   // ─── Reservations ──────────────────────────────────────────────────────────
+
+  /**
+   * POST /restaurants/:restaurantId/reservations/admin
+   * PLATFORM_ADMIN or assigned RESTAURANT_ADMIN — creates a PENDING table
+   * reservation for an existing **CUSTOMER** (staff-assisted booking).
+   */
+  @Post(':restaurantId/reservations/admin')
+  @ApiOperation({
+    summary:
+      'Create a PENDING table reservation for a customer (admin/staff; same rules as customer flow)',
+  })
+  @Roles('PLATFORM_ADMIN', 'RESTAURANT_ADMIN')
+  createAdminTableReservation(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @Body() dto: CreateAdminTableReservationDto,
+    @CurrentUser() user: SafeUser,
+  ): Promise<AdminTableReservationResponse> {
+    return this.restaurants.createAdminReservation(restaurantId, dto, user);
+  }
 
   /**
    * POST /restaurants/:restaurantId/reservations

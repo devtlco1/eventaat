@@ -148,6 +148,18 @@ export function createRestaurant(
   });
 }
 
+export function updateRestaurant(
+  token: string,
+  id: string,
+  input: Partial<CreateRestaurantInput> & { isActive?: boolean },
+): Promise<Restaurant> {
+  return apiRequest<Restaurant>(`/restaurants/${id}`, {
+    method: 'PATCH',
+    token,
+    body: JSON.stringify(input),
+  });
+}
+
 export type RestaurantTable = {
   id: string;
   restaurantId: string;
@@ -306,6 +318,27 @@ export function updateReservationStatus(
       token,
       body: JSON.stringify({ status, ...(note ? { note } : {}) }),
     },
+  );
+}
+
+/** Staff create on behalf of a customer; response matches list row shape. */
+export type CreateAdminTableReservationInput = {
+  customerId: string;
+  partySize: number;
+  startAt: string;
+  endAt: string;
+  specialRequest?: string;
+  tableId?: string;
+};
+
+export function createAdminTableReservation(
+  token: string,
+  restaurantId: string,
+  input: CreateAdminTableReservationInput,
+): Promise<RestaurantReservation> {
+  return apiRequest<RestaurantReservation>(
+    `/restaurants/${restaurantId}/reservations/admin`,
+    { method: 'POST', token, body: JSON.stringify(input) },
   );
 }
 
