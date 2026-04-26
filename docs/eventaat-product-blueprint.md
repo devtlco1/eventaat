@@ -5,6 +5,8 @@
 
 This document describes the product vision, principles, and roadmap for **eventaat** as a restaurant discovery and **reservation request** platform. It reflects the current rebuilt system and uses the original project only as *product* inspiration, not as a template for code or architecture.
 
+**Local development setup (tooling, ports, Docker):** see [local-development.md](local-development.md).
+
 ---
 
 ## 1. Product Vision

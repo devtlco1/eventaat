@@ -9,10 +9,21 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "dev": "echo \"Run dev per app: npm run dev -w apps/api | -w apps/admin | -w apps/mobile\"",
+    "dev": "echo \"Local workflow: see docs/local-development.md — use api:*, admin:*, mobile:*, check:* from root.\"",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present",
+    "api:generate": "npm run prisma:generate -w @eventaat/api",
+    "api:build": "npm run build -w @eventaat/api",
+    "api:start": "npm run start -w @eventaat/api",
+    "api:dev": "npm run dev -w @eventaat/api",
+    "admin:dev": "npm run dev -w @eventaat/admin",
+    "admin:build": "npm run build -w @eventaat/admin",
+    "mobile:dev": "npm run dev -w @eventaat/mobile",
+    "mobile:typecheck": "NODE_OPTIONS=--max-old-space-size=8192 npm run typecheck -w @eventaat/mobile",
+    "check:api": "npm run typecheck -w @eventaat/api",
+    "check:admin": "npm run typecheck -w @eventaat/admin",
+    "check:mobile": "npm run mobile:typecheck"
   },
   "engines": {
     "node": ">=22.0.0 <23",
