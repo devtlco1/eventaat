@@ -2,6 +2,10 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AdminEmptyState } from '../../../../components/admin/AdminEmptyState';
+import { AdminErrorState } from '../../../../components/admin/AdminErrorState';
+import { AdminPageHeader } from '../../../../components/admin/AdminPageHeader';
+import { AdminTypeBadge } from '../../../../components/admin/AdminTypeBadge';
 import { Button } from '../../../../components/Button';
 import {
   getReservationOperations,
@@ -46,7 +50,7 @@ function when(iso: string): string {
 
 const TYPE_OPTIONS: { value: TypeFilter; label: string }[] = [
   { value: 'ALL', label: 'All types' },
-  { value: 'TABLE', label: 'Table' },
+  { value: 'TABLE', label: 'Restaurant (table)' },
   { value: 'EVENT', label: 'Event' },
 ];
 
@@ -68,12 +72,16 @@ function StatLine({
   sub?: string;
 }) {
   return (
-    <div className="rounded-md border border-zinc-200 bg-white px-4 py-3">
-      <div className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+    <div className="rounded-md border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-700/80 dark:bg-zinc-900/60">
+      <div className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
         {label}
       </div>
-      <div className="mt-1 text-2xl font-semibold text-zinc-900">{value}</div>
-      {sub ? <div className="mt-0.5 text-xs text-zinc-500">{sub}</div> : null}
+      <div className="mt-1 text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
+        {value}
+      </div>
+      {sub ? (
+        <div className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-500">{sub}</div>
+      ) : null}
     </div>
   );
 }
@@ -93,7 +101,7 @@ function RowBlock({
   showActions,
   onAfterAction,
 }: RowBlockProps) {
-  const href =
+  const listHref =
     row.type === 'TABLE'
       ? globalTableReservationsPath({
           restaurantId: row.restaurant.id,
@@ -110,7 +118,7 @@ function RowBlock({
 
   async function onConfirmTable() {
     if (row.type !== 'TABLE') return;
-    if (!window.confirm('Confirm this table reservation?')) return;
+    if (!window.confirm('Confirm this restaurant booking?')) return;
     const token = getToken();
     if (!token) return;
     setBusy(true);
@@ -164,7 +172,7 @@ function RowBlock({
 
   async function onConfirmEvent() {
     if (row.type !== 'EVENT') return;
-    if (!window.confirm('Confirm this event reservation?')) return;
+    if (!window.confirm('Confirm this event booking?')) return;
     const token = getToken();
     if (!token) return;
     setBusy(true);
@@ -186,7 +194,7 @@ function RowBlock({
         setErr(
           typeof e === 'object' && e && 'message' in e
             ? String((e as { message: string }).message)
-            : 'Not enough capacity or business rule',
+            : 'Not enough capacity or a business rule blocked this.',
         );
       } else {
         setErr(
@@ -231,49 +239,55 @@ function RowBlock({
 
   return (
     <li className="list-none">
-      <div className="flex flex-col gap-2 rounded-md border border-zinc-200 bg-white p-3 text-sm sm:flex-row sm:items-stretch sm:justify-between sm:gap-3">
+      <div className="flex flex-col gap-2 rounded-md border border-zinc-200 bg-white p-3 text-sm dark:border-zinc-700/80 dark:bg-zinc-900/60 sm:flex-row sm:items-stretch sm:justify-between sm:gap-3">
         <div className="min-w-0 flex-1">
-          <Link
-            href={href}
-            className="block text-left text-zinc-800 hover:underline"
-          >
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <span className="font-medium text-zinc-900">
-                {row.type === 'TABLE' ? 'TABLE' : 'EVENT'}
-                {showEventTitle && row.type === 'EVENT' ? (
-                  <span className="ml-1 font-normal text-zinc-600">
-                    — {row.eventTitle}
-                  </span>
-                ) : null}
-              </span>
-              <span className="text-xs text-zinc-500">{itemStatus(row)}</span>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <AdminTypeBadge type={row.type} />
+              {showEventTitle && row.type === 'EVENT' ? (
+                <span className="text-zinc-700 dark:text-zinc-200">
+                  {row.eventTitle}
+                </span>
+              ) : null}
             </div>
-            <div className="mt-1 text-zinc-700">
-              {row.customer.fullName} · {row.customer.email}
-              {row.customer.phone ? ` · ${row.customer.phone}` : ''}
+            <span className="text-xs text-zinc-500 dark:text-zinc-500">
+              {itemStatus(row)}
+            </span>
+          </div>
+          <div className="mt-1 text-zinc-800 dark:text-zinc-200">
+            {row.customer.fullName} · {row.customer.email}
+            {row.customer.phone ? ` · ${row.customer.phone}` : ''}
+          </div>
+          <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
+            {row.restaurant.name} · party {row.partySize} · requested{' '}
+            {when(row.requestedAt)}
+          </div>
+          {row.type === 'TABLE' && showRequestSlot ? (
+            <div className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-500">
+              Seating window: {when(row.startAt)} – {when(row.endAt)}
             </div>
-            <div className="mt-1 text-xs text-zinc-500">
-              {row.restaurant.name} · party {row.partySize} · requested{' '}
-              {when(row.requestedAt)}
-            </div>
-            {row.type === 'TABLE' && showRequestSlot ? (
-              <div className="mt-0.5 text-xs text-zinc-500">
-                Table window: {when(row.startAt)} – {when(row.endAt)}
-              </div>
-            ) : null}
-            {row.type === 'EVENT' && showRequestSlot ? (
-              <div className="mt-0.5 text-xs text-zinc-500">
-                Event: {when(row.eventStartsAt)} – {when(row.eventEndsAt)}
-              </div>
-            ) : null}
-            {row.note ? (
-              <div className="mt-1 text-xs text-zinc-600">Note: {row.note}</div>
-            ) : null}
-            <div className="mt-1 text-xs text-zinc-500">Open full list →</div>
-          </Link>
-          {err ? (
-            <div className="mt-2 text-xs text-red-700">{err}</div>
           ) : null}
+          {row.type === 'EVENT' && showRequestSlot ? (
+            <div className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-500">
+              Event night: {when(row.eventStartsAt)} – {when(row.eventEndsAt)}
+            </div>
+          ) : null}
+          {row.note ? (
+            <div className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
+              Note: {row.note}
+            </div>
+          ) : null}
+          <div className="mt-2">
+            <Link
+              href={listHref}
+              className="text-xs font-medium text-amber-800 underline dark:text-amber-300/90"
+            >
+              {row.type === 'TABLE'
+                ? 'Open in Restaurant bookings'
+                : 'Open in Event bookings'}
+            </Link>
+          </div>
+          {err ? <div className="mt-2 text-xs text-red-700 dark:text-red-300">{err}</div> : null}
         </div>
         {showActions && pending ? (
           <div className="flex shrink-0 flex-col justify-center gap-2 sm:w-36">
@@ -327,7 +341,7 @@ function RowBlock({
   );
 }
 
-export default function OperationsPage() {
+export default function PendingWorkPage() {
   const [data, setData] = useState<ReservationOperationsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -350,7 +364,7 @@ export default function OperationsPage() {
         setError(
           typeof err === 'object' && err && 'message' in err
             ? String((err as { message: unknown }).message)
-            : 'Failed to load reservation operations',
+            : 'Failed to load the work queue',
         );
         setData(null);
       } finally {
@@ -371,47 +385,46 @@ export default function OperationsPage() {
         showNeedsSection: true,
       };
     }
-    const canSeeNeeds =
-      statusFilter === 'ALL' || statusFilter === 'PENDING';
+    const canSeeNeeds = statusFilter === 'ALL' || statusFilter === 'PENDING';
     const needs = canSeeNeeds
-      ? data.needsAttention
-          .filter(
-            (r) =>
-              matchesType(r, typeFilter) &&
-              (statusFilter === 'ALL' || r.status === 'PENDING'),
-          )
+      ? data.needsAttention.filter(
+          (r) =>
+            matchesType(r, typeFilter) &&
+            (statusFilter === 'ALL' || r.status === 'PENDING'),
+        )
       : [];
     const recent = data.recentActivity.filter(
       (r) => matchesType(r, typeFilter) && matchesStatus(r, statusFilter),
     );
-    return { filteredNeeds: needs, filteredRecent: recent, showNeedsSection: canSeeNeeds };
+    return {
+      filteredNeeds: needs,
+      filteredRecent: recent,
+      showNeedsSection: canSeeNeeds,
+    };
   }, [data, typeFilter, statusFilter]);
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-xl font-semibold text-zinc-900">
-          Pending bookings
-        </h1>
-        <p className="mt-1 text-sm text-zinc-600">
-          All pending and recent table and event booking activity for your
-          scope (restaurants: {data?.scopeRestaurantCount ?? 0}).
-        </p>
-      </div>
+      <AdminPageHeader
+        title="Pending work"
+        description={`Table and event bookings for your access (${data?.scopeRestaurantCount ?? 0} restaurant${
+          (data?.scopeRestaurantCount ?? 0) === 1 ? '' : 's'
+        }). Use filters to view recent non-pending activity.`}
+      />
 
       {loading ? (
-        <p className="text-sm text-zinc-600">Loading…</p>
+        <p className="text-sm text-zinc-600 dark:text-zinc-300">Loading…</p>
       ) : error ? (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </div>
+        <AdminErrorState>{error}</AdminErrorState>
       ) : data ? (
         <>
           <div>
-            <h2 className="mb-2 text-sm font-semibold text-zinc-900">Summary</h2>
+            <h2 className="mb-2 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+              Summary
+            </h2>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <StatLine
-                label="Pending table"
+                label="Pending restaurant"
                 value={data.summary.pendingTableCount}
               />
               <StatLine
@@ -432,10 +445,10 @@ export default function OperationsPage() {
           </div>
 
           <div className="flex flex-wrap items-end gap-3">
-            <label className="text-sm text-zinc-700">
+            <label className="text-sm text-zinc-700 dark:text-zinc-200">
               <span className="mr-2">Type</span>
               <select
-                className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm"
+                className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value as TypeFilter)}
               >
@@ -446,10 +459,10 @@ export default function OperationsPage() {
                 ))}
               </select>
             </label>
-            <label className="text-sm text-zinc-700">
+            <label className="text-sm text-zinc-700 dark:text-zinc-200">
               <span className="mr-2">Status</span>
               <select
-                className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm"
+                className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
                 value={statusFilter}
                 onChange={(e) =>
                   setStatusFilter(e.target.value as StatusFilter)
@@ -464,7 +477,7 @@ export default function OperationsPage() {
             </label>
             <button
               type="button"
-              className="text-sm text-zinc-600 underline"
+              className="text-sm text-zinc-600 underline dark:text-zinc-400"
               onClick={load}
             >
               Refresh
@@ -472,8 +485,8 @@ export default function OperationsPage() {
           </div>
 
           <div>
-            <h2 className="mb-2 text-sm font-semibold text-zinc-900">
-              Needs attention (pending)
+            <h2 className="mb-2 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+              Queued (pending)
             </h2>
             {showNeedsSection ? (
               filteredNeeds.length > 0 ? (
@@ -490,21 +503,21 @@ export default function OperationsPage() {
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm text-zinc-500">
+                <AdminEmptyState>
                   No pending items match the filters.
-                </p>
+                </AdminEmptyState>
               )
             ) : (
-              <p className="text-sm text-zinc-500">
-                Set status to &quot;All&quot; or &quot;Pending&quot; for pending
-                work.
-              </p>
+              <AdminEmptyState>
+                Set status to &quot;All&quot; or &quot;Pending&quot; to work the
+                live queue.
+              </AdminEmptyState>
             )}
           </div>
 
           <div>
-            <h2 className="mb-2 text-sm font-semibold text-zinc-900">
-              Recent activity (7 days)
+            <h2 className="mb-2 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+              Recent (7 days)
             </h2>
             {filteredRecent.length > 0 ? (
               <ul className="space-y-2">
@@ -520,12 +533,12 @@ export default function OperationsPage() {
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-zinc-500">No items match the filters.</p>
+              <AdminEmptyState>No items match the filters.</AdminEmptyState>
             )}
           </div>
         </>
       ) : (
-        <p className="text-sm text-zinc-600">No data.</p>
+        <AdminEmptyState>Nothing to show.</AdminEmptyState>
       )}
     </div>
   );

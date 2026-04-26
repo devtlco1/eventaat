@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
+import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
 import { Button } from '../../components/Button';
 import {
   getMe,
@@ -309,11 +310,16 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-          Dashboard
-        </h1>
+        <AdminPageHeader
+          title="Dashboard"
+          description={
+            isStaff
+              ? 'Counts and the next actions to open in other screens.'
+              : undefined
+          }
+        />
         {isStaff && (
-          <p className="mt-2 text-sm text-zinc-600">
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
             <Link
               href={pendingBookingsPath()}
               className="font-medium text-zinc-800 underline dark:text-zinc-200"

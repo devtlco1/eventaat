@@ -2,8 +2,11 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Badge } from '../../../../components/Badge';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AdminEmptyState } from '../../../../components/admin/AdminEmptyState';
+import { AdminErrorState } from '../../../../components/admin/AdminErrorState';
+import { AdminPageHeader } from '../../../../components/admin/AdminPageHeader';
+import { AdminStatusBadge } from '../../../../components/admin/AdminStatusBadge';
 import { Button } from '../../../../components/Button';
 import {
   getMe,
@@ -54,11 +57,16 @@ export default function GlobalEventReservationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState<Record<string, boolean>>({});
+  const [rowError, setRowError] = useState<Record<string, string | undefined>>(
+    {},
+  );
   const [restFilter, setRestFilter] = useState<string>(qRest || 'ALL');
   const [eventFilter, setEventFilter] = useState<string>(qEvent || 'ALL');
   const [statusFilter, setStatusFilter] = useState<
     EventReservationStatus | 'ALL'
   >('ALL');
+  const [missingHighlight, setMissingHighlight] = useState(false);
+  const deepLinkTuned = useRef(false);
 
   const canManage = me?.role === 'PLATFORM_ADMIN' || me?.role === 'RESTAURANT_ADMIN';
 
@@ -92,13 +100,33 @@ export default function GlobalEventReservationsPage() {
         setError(
           typeof err === 'object' && err && 'message' in err
             ? String((err as { message: unknown }).message)
-            : 'Failed to load event reservations',
+            : 'Failed to load event bookings',
         );
       } finally {
         setLoading(false);
       }
     })();
   }, [refresh]);
+
+  useEffect(() => {
+    if (loading || !rows.length) return;
+    if (!highlightId) {
+      deepLinkTuned.current = false;
+      setMissingHighlight(false);
+      return;
+    }
+    if (deepLinkTuned.current) return;
+    const found = rows.find((r) => r.id === highlightId);
+    if (found) {
+      setRestFilter(found.restaurantId);
+      setEventFilter(found.eventId);
+      setStatusFilter('ALL');
+      setMissingHighlight(false);
+    } else {
+      setMissingHighlight(true);
+    }
+    deepLinkTuned.current = true;
+  }, [loading, highlightId, rows]);
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
@@ -117,7 +145,7 @@ export default function GlobalEventReservationsPage() {
         ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }, 150);
     return () => clearTimeout(t);
-  }, [loading, highlightId, filtered.length]);
+  }, [loading, highlightId, filtered.length, rows.length]);
 
   async function setStatus(
     restaurantId: string,
@@ -128,6 +156,7 @@ export default function GlobalEventReservationsPage() {
     const token = getToken();
     if (!token || !canManage) return;
     setError(null);
+    setRowError((m) => ({ ...m, [id]: undefined }));
     setUpdating((m) => ({ ...m, [id]: true }));
     try {
       await updateEventReservationStatus(token, restaurantId, id, {
@@ -143,20 +172,31 @@ export default function GlobalEventReservationsPage() {
           ? Number((err as { status: number }).status)
           : undefined;
       if (code === 403) {
-        setError('You do not have permission to update this request.');
+        setRowError((m) => ({
+          ...m,
+          [id]: 'You do not have permission to update this request.',
+        }));
         return;
       }
       if (code === 422) {
-        setError(
-          typeof err === 'object' && err && 'message' in err
-            ? String((err as { message: string }).message)
-            : 'Request could not be processed (e.g. capacity).',
-        );
+        setRowError((m) => ({
+          ...m,
+          [id]:
+            (typeof err === 'object' &&
+              err &&
+              'message' in err &&
+              String((err as { message: string }).message)) ||
+            'Capacity or another rule blocked this change.',
+        }));
         return;
       }
-      setError(
-        err instanceof Error ? err.message : 'Failed to update reservation',
-      );
+      setRowError((m) => ({
+        ...m,
+        [id]:
+          err instanceof Error
+            ? err.message
+            : 'Failed to update the booking',
+      }));
     } finally {
       setUpdating((m) => {
         const n = { ...m };
@@ -174,41 +214,49 @@ export default function GlobalEventReservationsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-zinc-900">Event bookings</h1>
-        <p className="mt-1 text-sm text-zinc-600">
-          Reservations for approved event nights. Regular table requests are
-          under{' '}
+      <AdminPageHeader
+        title="Event bookings"
+        description="Guest bookings for an approved event night. Table seating requests are under Restaurant bookings."
+        extra={
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-500">
+            <Link
+              href="/dashboard/bookings/restaurants"
+              className="font-medium text-zinc-800 underline dark:text-amber-200/90"
+            >
+              Open Restaurant bookings
+            </Link>
+          </p>
+        }
+      />
+
+      {error ? <AdminErrorState>{error}</AdminErrorState> : null}
+
+      {highlightId && !loading ? (
+        <p
+          className={[
+            'text-xs',
+            missingHighlight
+              ? 'text-amber-900 dark:text-amber-200/90'
+              : 'text-amber-900/90 dark:text-amber-200/90',
+          ].join(' ')}
+        >
+          {missingHighlight
+            ? 'The linked event booking is not in your list (wrong account or it no longer exists).'
+            : 'A row is highlighted from the link.'}{' '}
           <Link
-            className="font-medium text-zinc-800 underline"
-            href="/dashboard/bookings/restaurants"
+            className="font-medium underline"
+            href="/dashboard/bookings/events"
           >
-            Restaurant bookings
-          </Link>
-          . Guest capacity is enforced on confirm in the API.
-        </p>
-      </div>
-
-      {error ? (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </div>
-      ) : null}
-
-      {highlightId ? (
-        <p className="text-xs text-amber-900/90">
-          Row <code className="text-zinc-700">{highlightId}</code> —{' '}
-          <Link className="font-medium underline" href="/dashboard/bookings/events">
-            Clear
+            Clear link
           </Link>
         </p>
       ) : null}
 
       <div className="flex flex-wrap items-end gap-3">
-        <label className="text-sm text-zinc-700">
+        <label className="text-sm text-zinc-700 dark:text-zinc-200">
           <span className="mr-2">Restaurant</span>
           <select
-            className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm"
+            className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
             value={restFilter}
             onChange={(e) => setRestFilter(e.target.value)}
           >
@@ -220,10 +268,10 @@ export default function GlobalEventReservationsPage() {
             ))}
           </select>
         </label>
-        <label className="text-sm text-zinc-700">
-          <span className="mr-2">Event</span>
+        <label className="text-sm text-zinc-700 dark:text-zinc-200">
+          <span className="mr-2">Event night</span>
           <select
-            className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm"
+            className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
             value={eventFilter}
             onChange={(e) => setEventFilter(e.target.value)}
           >
@@ -235,10 +283,10 @@ export default function GlobalEventReservationsPage() {
             ))}
           </select>
         </label>
-        <label className="text-sm text-zinc-700">
+        <label className="text-sm text-zinc-700 dark:text-zinc-200">
           <span className="mr-2">Status</span>
           <select
-            className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm"
+            className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
             value={statusFilter}
             onChange={(e) =>
               setStatusFilter(e.target.value as EventReservationStatus | 'ALL')
@@ -256,9 +304,9 @@ export default function GlobalEventReservationsPage() {
         </Button>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/60">
         <table className="min-w-full text-left text-sm">
-          <thead className="bg-zinc-50 text-xs uppercase text-zinc-500">
+          <thead className="bg-zinc-50 text-xs uppercase text-zinc-500 dark:bg-zinc-800/80 dark:text-zinc-400">
             <tr>
               <th className="px-3 py-2">Type / ID</th>
               <th className="px-3 py-2">Restaurant</th>
@@ -271,84 +319,106 @@ export default function GlobalEventReservationsPage() {
               <th className="px-3 py-2">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-200">
+          <tbody className="divide-y divide-zinc-200 dark:divide-zinc-700/80">
             {loading ? (
               <tr>
-                <td colSpan={9} className="px-3 py-4 text-zinc-600">
+                <td colSpan={9} className="px-3 py-4 text-zinc-600 dark:text-zinc-400">
                   Loading…
                 </td>
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-3 py-4 text-zinc-600">
-                  No rows match the filters.
+                <td colSpan={9} className="px-3 py-4">
+                  <AdminEmptyState>
+                    No event bookings match the filters.
+                  </AdminEmptyState>
                 </td>
               </tr>
             ) : (
               filtered.map((r) => {
                 const busy = !!updating[r.id];
+                const re = rowError[r.id];
                 return (
                   <tr
                     key={r.id}
                     id={`admin-event-resv-${r.id}`}
                     className={
                       highlightId === r.id
-                        ? 'bg-amber-50/70 ring-1 ring-amber-300'
-                        : 'hover:bg-zinc-50/80'
+                        ? 'bg-amber-50/70 ring-1 ring-amber-300 dark:bg-amber-950/30 dark:ring-amber-700/60'
+                        : 'hover:bg-zinc-50/80 dark:hover:bg-zinc-800/50'
                     }
                   >
                     <td className="px-3 py-2 align-top text-xs">
-                      <span className="font-semibold">EVENT</span>
+                      <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                        EVENT
+                      </span>
                       <div className="mt-0.5 break-all text-[10px] text-zinc-500">
                         {r.id}
                       </div>
                     </td>
-                    <td className="px-3 py-2 align-top text-zinc-800">
+                    <td className="px-3 py-2 align-top text-zinc-800 dark:text-zinc-200">
                       {r.restaurant.name}
                       <div>
                         <Link
-                          className="text-xs text-zinc-600 underline"
-                          href={perRestaurantEventReservationsPath(r.restaurantId)}
+                          className="text-xs text-zinc-600 underline dark:text-amber-200/80"
+                          href={perRestaurantEventReservationsPath(
+                            r.restaurantId,
+                          )}
                         >
                           Venue list
                         </Link>
                       </div>
+                      <div>
+                        <Link
+                          className="text-xs text-zinc-500 underline dark:text-zinc-500"
+                          href={globalEventReservationsPath({
+                            restaurantId: r.restaurantId,
+                            eventId: r.eventId,
+                            eventReservationId: r.id,
+                          })}
+                        >
+                          Link
+                        </Link>
+                      </div>
                     </td>
-                    <td className="px-3 py-2 max-w-[10rem] text-zinc-800">
+                    <td className="px-3 py-2 text-zinc-800 dark:text-zinc-200 max-w-[10rem]">
                       {r.event.title}
                     </td>
-                    <td className="px-3 py-2 text-xs text-zinc-600">
-                      {fmt(r.event.startsAt)}
+                    <td className="px-3 py-2 text-xs text-zinc-600 dark:text-zinc-400">
+                      {fmt(r.event.startsAt)} — {fmt(r.event.endsAt)}
                     </td>
                     <td className="px-3 py-2">
                       <div>{r.customer.fullName}</div>
-                      <div className="text-xs text-zinc-500">{r.customer.email}</div>
+                      <div className="text-xs text-zinc-500">
+                        {r.customer.email}
+                      </div>
                     </td>
                     <td className="px-3 py-2">{r.partySize}</td>
                     <td className="px-3 py-2">
-                      <Badge tone={eventStatusTone(r.status)}>{r.status}</Badge>
+                      <AdminStatusBadge tone={eventStatusTone(r.status)}>
+                        {r.status}
+                      </AdminStatusBadge>
                     </td>
-                    <td className="max-w-[12rem] px-3 py-2 text-xs text-zinc-600">
+                    <td className="max-w-[12rem] px-3 py-2 text-xs text-zinc-600 dark:text-zinc-300">
                       {r.note || r.specialRequest || '—'}
                       {r.rejectionReason ? (
-                        <div className="text-amber-900/90">Reject: {r.rejectionReason}</div>
+                        <div className="text-amber-900/90 dark:text-amber-200/80">
+                          Reject: {r.rejectionReason}
+                        </div>
                       ) : null}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 align-top">
                       {r.status === 'PENDING' && canManage ? (
-                        <div className="flex flex-col gap-1">
+                        <div className="flex max-w-[8rem] flex-col gap-1">
                           <Button
                             variant="secondary"
                             className="!px-2 !py-1 !text-xs"
                             disabled={busy}
                             onClick={() => {
-                              if (!window.confirm('Confirm this event reservation?'))
+                              if (!window.confirm('Confirm this event booking?')) {
                                 return;
-                              void setStatus(
-                                r.restaurantId,
-                                r.id,
-                                'CONFIRMED',
-                              );
+                              }
+                              void setStatus(r.restaurantId, r.id, 'CONFIRMED');
                             }}
                           >
                             Confirm
@@ -361,6 +431,11 @@ export default function GlobalEventReservationsPage() {
                           >
                             Reject
                           </Button>
+                          {re ? (
+                            <span className="text-[11px] text-red-600 dark:text-red-300/95">
+                              {re}
+                            </span>
+                          ) : null}
                         </div>
                       ) : (
                         <span className="text-xs text-zinc-400">—</span>

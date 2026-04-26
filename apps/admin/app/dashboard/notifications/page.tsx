@@ -2,14 +2,15 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
+import { AdminEmptyState } from '../../../components/admin/AdminEmptyState';
+import { AdminErrorState } from '../../../components/admin/AdminErrorState';
+import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
 import { Button } from '../../../components/Button';
 import {
-  getMe,
   listMyNotifications,
   markAllNotificationsRead,
   markNotificationRead,
   type InAppNotification,
-  type MeResponse,
 } from '../../../lib/api';
 import { getToken } from '../../../lib/auth';
 import { getNotificationAdminPath } from '../../../lib/notificationLinks';
@@ -22,7 +23,6 @@ function fmt(iso: string): string {
 
 export default function AdminNotificationsPage() {
   const router = useRouter();
-  const [me, setMe] = useState<MeResponse | null>(null);
   const [rows, setRows] = useState<InAppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -35,8 +35,7 @@ export default function AdminNotificationsPage() {
     setErr(null);
     setLoading(true);
     try {
-      const [m, data] = await Promise.all([getMe(token), listMyNotifications(token, { limit: 100 })]);
-      setMe(m);
+      const data = await listMyNotifications(token, { limit: 100 });
       setRows(data.notifications);
       setUnreadCount(data.unreadCount);
     } catch (e) {
@@ -93,25 +92,18 @@ export default function AdminNotificationsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-zinc-900">Notifications</h1>
-        <p className="mt-1 text-sm text-zinc-600">
-          In-app messages for {me ? `${me.fullName} (${me.role})` : '…'}. Pushes and email are not
-          used yet.
-        </p>
-      </div>
-      {err ? (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {err}
-        </div>
-      ) : null}
+      <AdminPageHeader
+        title="Notifications"
+        description="In-app list only. Click a row to mark read and go to the linked area when available. No email or push yet."
+      />
+      {err ? <AdminErrorState>{err}</AdminErrorState> : null}
       {navErr ? (
-        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-200/90">
           {navErr}
         </div>
       ) : null}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-zinc-600">
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
           {unreadCount} unread
           {loading ? ' — loading' : null}
         </p>
@@ -123,7 +115,9 @@ export default function AdminNotificationsPage() {
       </div>
       <ul className="space-y-2">
         {rows.length === 0 && !loading ? (
-          <li className="text-sm text-zinc-500">No notifications.</li>
+          <li>
+            <AdminEmptyState>No notifications.</AdminEmptyState>
+          </li>
         ) : null}
         {rows.map((n) => {
           const unread = !n.readAt;
@@ -132,7 +126,9 @@ export default function AdminNotificationsPage() {
               key={n.id}
               className={
                 'cursor-pointer rounded-md border p-3 text-sm ' +
-                (unread ? 'border-sky-200 bg-sky-50' : 'border-zinc-200 bg-white')
+                (unread
+                  ? 'border-sky-200 bg-sky-50 dark:border-sky-800/60 dark:bg-sky-950/30'
+                  : 'border-zinc-200 bg-white dark:border-zinc-700/80 dark:bg-zinc-900/60')
               }
               onClick={() => void openNotification(n)}
               onKeyDown={(e) => {
@@ -144,9 +140,11 @@ export default function AdminNotificationsPage() {
               role="button"
               tabIndex={0}
             >
-              <div className="font-medium text-zinc-900">{n.title}</div>
-              <p className="mt-1 text-zinc-700">{n.message}</p>
-              <p className="mt-1 text-xs text-zinc-500">
+              <div className="font-medium text-zinc-900 dark:text-zinc-100">
+                {n.title}
+              </div>
+              <p className="mt-1 text-zinc-700 dark:text-zinc-300">{n.message}</p>
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
                 {fmt(n.createdAt)} — {n.type} — click to open
               </p>
             </li>

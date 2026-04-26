@@ -2,7 +2,10 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Badge } from '../../../components/Badge';
+import { AdminEmptyState } from '../../../components/admin/AdminEmptyState';
+import { AdminErrorState } from '../../../components/admin/AdminErrorState';
+import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
+import { AdminStatusBadge } from '../../../components/admin/AdminStatusBadge';
 import { Button } from '../../../components/Button';
 import {
   getMe,
@@ -25,7 +28,7 @@ const STATUS_OPTIONS: (RestaurantEventStatus | 'ALL')[] = [
 
 function eventTone(
   s: RestaurantEventStatus,
-): Parameters<typeof Badge>[0]['tone'] {
+): Parameters<typeof AdminStatusBadge>[0]['tone'] {
   if (s === 'PENDING') return 'yellow';
   if (s === 'APPROVED') return 'green';
   if (s === 'REJECTED' || s === 'CANCELLED') return 'zinc';
@@ -147,23 +150,25 @@ export default function EventNightsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-zinc-900">Event nights</h1>
-        <p className="mt-1 text-sm text-zinc-600">
-          One-off and special events across your venues. Platform approval
-          (when required) uses the same rules as the restaurant event pages.
-        </p>
-      </div>
-      {error ? (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          {error}
-        </div>
-      ) : null}
+      <AdminPageHeader
+        title="Event nights"
+        description="Planned one-off and special event nights (not the guest booking list). Customer bookings for a night are under Event bookings."
+        extra={
+          me && !isPlatform ? (
+            <p className="mt-2 text-sm text-amber-900/90 dark:text-amber-200/85">
+              PENDING event nights are approved or rejected by the platform. Open your
+              venue&rsquo;s list to add or change details; this page shows every night
+              you can access.
+            </p>
+          ) : null
+        }
+      />
+      {error ? <AdminErrorState>{error}</AdminErrorState> : null}
       <div className="flex flex-wrap items-end gap-3">
-        <label className="text-sm text-zinc-800">
+        <label className="text-sm text-zinc-800 dark:text-zinc-200">
           <span className="mr-2">Restaurant</span>
           <select
-            className="rounded border border-zinc-200 bg-white px-2 py-1.5 text-sm"
+            className="rounded border border-zinc-200 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
             value={restFilter}
             onChange={(e) => setRestFilter(e.target.value)}
           >
@@ -175,10 +180,10 @@ export default function EventNightsPage() {
             ))}
           </select>
         </label>
-        <label className="text-sm text-zinc-800">
+        <label className="text-sm text-zinc-800 dark:text-zinc-200">
           <span className="mr-2">Status</span>
           <select
-            className="rounded border border-zinc-200 bg-white px-2 py-1.5 text-sm"
+            className="rounded border border-zinc-200 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
             value={statusFilter}
             onChange={(e) =>
               setStatusFilter(e.target.value as typeof statusFilter)
@@ -196,58 +201,78 @@ export default function EventNightsPage() {
         </Button>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
+      <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white dark:border-zinc-700/80 dark:bg-zinc-900/60">
         <table className="min-w-full text-left text-sm">
-          <thead className="border-b border-zinc-100 bg-zinc-50/80 text-xs text-zinc-500">
+          <thead className="border-b border-zinc-100 bg-zinc-50/80 text-xs text-zinc-500 dark:border-zinc-700/80 dark:bg-zinc-800/80 dark:text-zinc-400">
             <tr>
               <th className="px-3 py-2">Title</th>
               <th className="px-3 py-2">Restaurant</th>
               <th className="px-3 py-2">Starts / ends</th>
               <th className="px-3 py-2">Status</th>
               <th className="px-3 py-2">Active</th>
+              <th className="px-3 py-2 min-w-[10rem]">Rejection / notes</th>
               <th className="px-3 py-2">Open</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-100">
+          <tbody className="divide-y divide-zinc-100 dark:divide-zinc-700/80">
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-3 py-4 text-zinc-500">
+                <td colSpan={7} className="px-3 py-4 text-zinc-500">
                   Loading…
                 </td>
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-3 py-4 text-zinc-500">
-                  No events for these filters.
+                <td colSpan={7} className="px-3 py-4">
+                  <AdminEmptyState>
+                    No event nights for these filters.
+                  </AdminEmptyState>
                 </td>
               </tr>
             ) : (
               filtered.map((ev) => {
                 const busy = !!updating[ev.id];
                 return (
-                  <tr key={ev.id} className="hover:bg-zinc-50/80">
-                    <td className="px-3 py-2 font-medium text-zinc-900">
+                  <tr key={ev.id} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40">
+                    <td className="px-3 py-2 font-medium text-zinc-900 dark:text-zinc-100">
                       {ev.title}
                     </td>
-                    <td className="px-3 py-2 text-zinc-700">
+                    <td className="px-3 py-2 text-zinc-700 dark:text-zinc-300">
                       {restaurantName(restaurants, ev.restaurantId)}
                     </td>
-                    <td className="px-3 py-2 text-xs text-zinc-600">
+                    <td className="px-3 py-2 text-xs text-zinc-600 dark:text-zinc-400">
                       {fmt(ev.startsAt)} — {fmt(ev.endsAt)}
                     </td>
                     <td className="px-3 py-2">
-                      <Badge tone={eventTone(ev.status)}>{ev.status}</Badge>
+                      <AdminStatusBadge tone={eventTone(ev.status)}>
+                        {ev.status}
+                      </AdminStatusBadge>
                     </td>
-                    <td className="px-3 py-2 text-zinc-600">
+                    <td className="px-3 py-2 text-zinc-600 dark:text-zinc-300">
                       {ev.isActive ? 'Yes' : 'No'}
+                    </td>
+                    <td className="max-w-[14rem] px-3 py-2 text-xs text-zinc-600 dark:text-zinc-300">
+                      {ev.status === 'PENDING' && !isPlatform ? (
+                        <span className="text-amber-900/90 dark:text-amber-200/85">
+                          Awaiting platform review
+                        </span>
+                      ) : null}
+                      {ev.rejectionReason ? (
+                        <div className="text-red-800 dark:text-red-200/90">
+                          Reject: {ev.rejectionReason}
+                        </div>
+                      ) : null}
+                      {ev.seatsAvailableNote ? (
+                        <div className="text-zinc-500">{ev.seatsAvailableNote}</div>
+                      ) : null}
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex flex-wrap items-center gap-1">
                         <Link
                           href={`/dashboard/restaurants/${ev.restaurantId}/events`}
-                          className="text-xs text-zinc-800 underline"
+                          className="text-xs text-zinc-800 underline dark:text-amber-200/90"
                         >
-                          Edit in venue
+                          Venue event nights
                         </Link>
                         {isPlatform && ev.status === 'PENDING' ? (
                           <>

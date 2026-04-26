@@ -127,7 +127,7 @@ Open: **http://localhost:3000/login**
 
 Use **localhost** in the browser, not the LAN IP, for the admin app during dev (Next dev is bound to your Mac).
 
-The post-login layout uses a **left sidebar** on `md+` and **Menu** on small screens. The sidebar is a **flat list** (no **section headings**), **branding** at the top, **main nav** in the middle, and at the **bottom** **Profile & account** (`/dashboard/account`), a **light/dark** control (localStorage and a `class` on the `html` element), and **Logout**. **Pending work** → `/dashboard/bookings/pending`; **Restaurant / Event bookings** → the global list routes. **Event nights** and **per-venue** pages are unchanged. Before `npm run admin:build`, run **`unset NODE_ENV`**.
+The post-login layout uses a **left sidebar** on `md+` and **Menu** on small screens. The sidebar is a **flat list** (no **section headings**), **branding** at the top, **main nav** in the middle, and at the **bottom** **Profile & account** (`/dashboard/account`), a **light/dark** control (localStorage and a `class` on the `html` element), and **Logout**. **Pending work** (`/dashboard/bookings/pending`) is the **work queue**; **Restaurant** vs **Event** bookings are separate **list** pages with **filters** and **URL highlight** for notifications. **Event nights** (`/dashboard/events`) is **nights** only, not the **event guest booking** list. Before `npm run admin:build`, run **`unset NODE_ENV`**. **Step 40D** QA’d these routes and shared `AdminPageHeader` / **empty** / **error** helpers; **no AppIcons** changes in that work.
 
 ---
 

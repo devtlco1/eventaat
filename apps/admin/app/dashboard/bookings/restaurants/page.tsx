@@ -2,8 +2,11 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
-import { Badge } from '../../../../components/Badge';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AdminEmptyState } from '../../../../components/admin/AdminEmptyState';
+import { AdminErrorState } from '../../../../components/admin/AdminErrorState';
+import { AdminPageHeader } from '../../../../components/admin/AdminPageHeader';
+import { AdminStatusBadge } from '../../../../components/admin/AdminStatusBadge';
 import { Button } from '../../../../components/Button';
 import {
   getMe,
@@ -33,7 +36,7 @@ const STATUS_FILTER: (ReservationStatus | 'ALL')[] = [
 
 function statusTone(
   status: ReservationStatus,
-): Parameters<typeof Badge>[0]['tone'] {
+): Parameters<typeof AdminStatusBadge>[0]['tone'] {
   switch (status) {
     case 'PENDING':
       return 'yellow';
@@ -70,6 +73,8 @@ export default function GlobalTableReservationsPage() {
   const [updating, setUpdating] = useState<Record<string, boolean>>({});
   const [restFilter, setRestFilter] = useState<string>(qRest || 'ALL');
   const [statusFilter, setStatusFilter] = useState<ReservationStatus | 'ALL'>('ALL');
+  const [missingHighlight, setMissingHighlight] = useState(false);
+  const deepLinkTuned = useRef(false);
 
   const canManage = me?.role === 'PLATFORM_ADMIN' || me?.role === 'RESTAURANT_ADMIN';
 
@@ -112,6 +117,25 @@ export default function GlobalTableReservationsPage() {
   }, [reservations, restFilter, statusFilter]);
 
   useEffect(() => {
+    if (loading || !reservations.length) return;
+    if (!highlightReservationId) {
+      deepLinkTuned.current = false;
+      setMissingHighlight(false);
+      return;
+    }
+    if (deepLinkTuned.current) return;
+    const found = reservations.find((r) => r.id === highlightReservationId);
+    if (found) {
+      setRestFilter(found.restaurantId);
+      setStatusFilter('ALL');
+      setMissingHighlight(false);
+    } else {
+      setMissingHighlight(true);
+    }
+    deepLinkTuned.current = true;
+  }, [loading, highlightReservationId, reservations]);
+
+  useEffect(() => {
     if (loading || !highlightReservationId) return;
     const t = setTimeout(() => {
       document
@@ -119,7 +143,7 @@ export default function GlobalTableReservationsPage() {
         ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }, 150);
     return () => clearTimeout(t);
-  }, [loading, highlightReservationId, filtered.length]);
+  }, [loading, highlightReservationId, filtered.length, reservations.length]);
 
   async function setStatus(
     restaurantId: string,
@@ -168,48 +192,49 @@ export default function GlobalTableReservationsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-zinc-900">
-          Restaurant bookings
-        </h1>
-        <p className="mt-1 text-sm text-zinc-600">
-          Regular table reservation requests. Event night guest lists are
-          under{' '}
-          <Link
-            href="/dashboard/bookings/events"
-            className="font-medium text-zinc-800 underline"
-          >
-            Event bookings
-          </Link>
-          .
-        </p>
-      </div>
+      <AdminPageHeader
+        title="Restaurant bookings"
+        description="Table and seating-time booking requests. Guest lists for an event night are in Event bookings."
+        extra={
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-500">
+            <Link
+              href="/dashboard/bookings/events"
+              className="font-medium text-zinc-800 underline dark:text-amber-200/90"
+            >
+              Open Event bookings
+            </Link>
+          </p>
+        }
+      />
 
-      {error ? (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </div>
-      ) : null}
+      {error ? <AdminErrorState>{error}</AdminErrorState> : null}
 
-      {highlightReservationId ? (
-        <p className="text-xs text-amber-900/90">
-          Row{' '}
-          <code className="text-zinc-700">{highlightReservationId}</code>{' '}
-          highlighted —{' '}
+      {highlightReservationId && !loading ? (
+        <p
+          className={[
+            'text-xs',
+            missingHighlight
+              ? 'text-amber-900 dark:text-amber-200/90'
+              : 'text-amber-900/90 dark:text-amber-200/90',
+          ].join(' ')}
+        >
+          {missingHighlight
+            ? 'The linked booking is not in your list (wrong account or it no longer exists).'
+            : 'A row is highlighted from the link.'}{' '}
           <Link
             className="font-medium underline"
             href="/dashboard/bookings/restaurants"
           >
-            Clear
+            Clear link
           </Link>
         </p>
       ) : null}
 
       <div className="flex flex-wrap items-end gap-3">
-        <label className="text-sm text-zinc-700">
+        <label className="text-sm text-zinc-700 dark:text-zinc-200">
           <span className="mr-2">Restaurant</span>
           <select
-            className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm"
+            className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
             value={restFilter}
             onChange={(e) => setRestFilter(e.target.value)}
           >
@@ -221,10 +246,10 @@ export default function GlobalTableReservationsPage() {
             ))}
           </select>
         </label>
-        <label className="text-sm text-zinc-700">
+        <label className="text-sm text-zinc-700 dark:text-zinc-200">
           <span className="mr-2">Status</span>
           <select
-            className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm"
+            className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
             value={statusFilter}
             onChange={(e) =>
               setStatusFilter(e.target.value as ReservationStatus | 'ALL')
@@ -242,9 +267,9 @@ export default function GlobalTableReservationsPage() {
         </Button>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/60">
         <table className="min-w-full text-left text-sm">
-          <thead className="bg-zinc-50 text-xs uppercase text-zinc-500">
+          <thead className="bg-zinc-50 text-xs uppercase text-zinc-500 dark:bg-zinc-800/80 dark:text-zinc-400">
             <tr>
               <th className="px-3 py-2">Type / ID</th>
               <th className="px-3 py-2">Restaurant</th>
@@ -259,14 +284,14 @@ export default function GlobalTableReservationsPage() {
           <tbody className="divide-y divide-zinc-200">
             {loading ? (
               <tr>
-                <td className="px-3 py-4 text-zinc-600" colSpan={8}>
+                <td className="px-3 py-4 text-zinc-600 dark:text-zinc-400" colSpan={8}>
                   Loading…
                 </td>
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td className="px-3 py-4 text-zinc-600" colSpan={8}>
-                  No reservations match the filters.
+                <td className="px-3 py-4" colSpan={8}>
+                  <AdminEmptyState>No bookings match the filters.</AdminEmptyState>
                 </td>
               </tr>
             ) : (
@@ -288,12 +313,14 @@ export default function GlobalTableReservationsPage() {
                       id={`admin-table-resv-${r.id}`}
                       className={
                         highlightReservationId === r.id
-                          ? 'bg-amber-50/70 ring-1 ring-amber-300'
-                          : 'hover:bg-zinc-50/80'
+                          ? 'bg-amber-50/70 ring-1 ring-amber-300 dark:bg-amber-950/30 dark:ring-amber-700/60'
+                          : 'hover:bg-zinc-50/80 dark:hover:bg-zinc-800/50'
                       }
                     >
                       <td className="px-3 py-2 align-top text-xs">
-                        <span className="font-semibold">TABLE</span>
+                        <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                          TABLE
+                        </span>
                         <div className="mt-0.5 break-all text-[10px] text-zinc-500">
                           {r.id}
                         </div>
@@ -333,7 +360,9 @@ export default function GlobalTableReservationsPage() {
                         {fmt(r.startAt)} — {fmt(r.endAt)}
                       </td>
                       <td className="px-3 py-2">
-                        <Badge tone={statusTone(r.status)}>{r.status}</Badge>
+                        <AdminStatusBadge tone={statusTone(r.status)}>
+                          {r.status}
+                        </AdminStatusBadge>
                       </td>
                       <td className="max-w-[12rem] px-3 py-2 text-xs text-zinc-600">
                         {r.note || r.specialRequest || '—'}

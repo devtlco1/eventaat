@@ -17,7 +17,7 @@ export default function LegacyPendingRedirect() {
   }, [r, sp]);
   if (!d) {
     return (
-      <p className="text-sm text-zinc-600">Redirecting to pending bookings…</p>
+      <p className="text-sm text-zinc-600">Redirecting to pending work…</p>
     );
   }
   return null;
