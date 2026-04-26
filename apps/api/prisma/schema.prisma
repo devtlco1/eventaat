@@ -83,7 +83,49 @@ model Restaurant {
   tables RestaurantTable[]
   reservations Reservation[]
 
+  operatingSettings RestaurantOperatingSettings?
+  openingHours     RestaurantOpeningHour[]
+
   @@map("restaurants")
+}
+
+/// Business rules and defaults for requests (one row per restaurant).
+/// Time-of-day and calendar checks use the server / local Date behavior; no per-venue IANA zone yet.
+model RestaurantOperatingSettings {
+  id         String   @id @default(uuid()) @db.Uuid
+  restaurantId String  @unique @map("restaurant_id") @db.Uuid
+  defaultReservationDurationMinutes Int @default(90) @map("default_reservation_duration_minutes")
+  minPartySize  Int   @default(1) @map("min_party_size")
+  maxPartySize  Int?  @map("max_party_size")
+  manualApprovalRequired Boolean @default(true) @map("manual_approval_required")
+  acceptsReservations Boolean   @default(true) @map("accepts_reservations")
+  advanceBookingDays  Int        @default(14) @map("advance_booking_days")
+  sameDayCutoffMinutes  Int     @default(60) @map("same_day_cutoff_minutes")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("restaurant_operating_settings")
+}
+
+/// Weekly schedule. dayOfWeek: 0=Sunday .. 6=Saturday (JavaScript getDay()).
+/// opensAt / closesAt are "HH:mm" 24h strings in local wall-clock for the business day.
+model RestaurantOpeningHour {
+  id        String   @id @default(uuid()) @db.Uuid
+  restaurantId String @map("restaurant_id") @db.Uuid
+  dayOfWeek  Int     @map("day_of_week")
+  opensAt    String  @map("opens_at")
+  closesAt   String  @map("closes_at")
+  isClosed   Boolean @default(false) @map("is_closed")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, dayOfWeek])
+  @@index([restaurantId])
+  @@map("restaurant_opening_hours")
 }
 
 model RestaurantTable {

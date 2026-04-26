@@ -31,6 +31,8 @@ import { CreateRestaurantTableDto } from './dto/create-restaurant-table.dto';
 import { UpdateReservationStatusDto } from './dto/update-reservation-status.dto';
 import { UpdateRestaurantDto } from './dto/update-restaurant.dto';
 import { UpdateRestaurantTableDto } from './dto/update-restaurant-table.dto';
+import { UpdateOpeningHoursDto } from './dto/update-opening-hours.dto';
+import { UpdateOperatingSettingsDto } from './dto/update-operating-settings.dto';
 import { RestaurantsService } from './restaurants.service';
 
 /**
@@ -66,6 +68,42 @@ export class RestaurantsController {
     @Query() query: AvailabilityQueryDto,
   ) {
     return this.restaurants.getAvailability(restaurantId, query);
+  }
+
+  @Get(':restaurantId/operating-settings')
+  getOperatingSettings(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @CurrentUser() user: SafeUser,
+  ) {
+    return this.restaurants.getOperatingSettings(restaurantId, user);
+  }
+
+  @Patch(':restaurantId/operating-settings')
+  @Roles('PLATFORM_ADMIN', 'RESTAURANT_ADMIN')
+  patchOperatingSettings(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @Body() dto: UpdateOperatingSettingsDto,
+    @CurrentUser() user: SafeUser,
+  ) {
+    return this.restaurants.updateOperatingSettings(restaurantId, dto, user);
+  }
+
+  @Get(':restaurantId/opening-hours')
+  getOpeningHours(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @CurrentUser() user: SafeUser,
+  ) {
+    return this.restaurants.getOpeningHours(restaurantId, user);
+  }
+
+  @Patch(':restaurantId/opening-hours')
+  @Roles('PLATFORM_ADMIN', 'RESTAURANT_ADMIN')
+  patchOpeningHours(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @Body() dto: UpdateOpeningHoursDto,
+    @CurrentUser() user: SafeUser,
+  ) {
+    return this.restaurants.updateOpeningHours(restaurantId, dto, user);
   }
 
   @Get(':id')

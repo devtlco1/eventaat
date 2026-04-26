@@ -354,3 +354,83 @@ export function updateUser(
   });
 }
 
+export type RestaurantOperatingSettings = {
+  id: string;
+  restaurantId: string;
+  defaultReservationDurationMinutes: number;
+  minPartySize: number;
+  maxPartySize: number | null;
+  manualApprovalRequired: boolean;
+  acceptsReservations: boolean;
+  advanceBookingDays: number;
+  sameDayCutoffMinutes: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RestaurantOpeningHour = {
+  id: string;
+  restaurantId: string;
+  dayOfWeek: number;
+  opensAt: string;
+  closesAt: string;
+  isClosed: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function getOperatingSettings(
+  token: string,
+  restaurantId: string,
+): Promise<RestaurantOperatingSettings> {
+  return apiRequest<RestaurantOperatingSettings>(
+    `/restaurants/${restaurantId}/operating-settings`,
+    { method: 'GET', token },
+  );
+}
+
+export function updateOperatingSettings(
+  token: string,
+  restaurantId: string,
+  input: Partial<{
+    defaultReservationDurationMinutes: number;
+    minPartySize: number;
+    maxPartySize: number | null;
+    manualApprovalRequired: boolean;
+    acceptsReservations: boolean;
+    advanceBookingDays: number;
+    sameDayCutoffMinutes: number;
+  }>,
+): Promise<RestaurantOperatingSettings> {
+  return apiRequest<RestaurantOperatingSettings>(
+    `/restaurants/${restaurantId}/operating-settings`,
+    { method: 'PATCH', token, body: JSON.stringify(input) },
+  );
+}
+
+export function getOpeningHours(
+  token: string,
+  restaurantId: string,
+): Promise<RestaurantOpeningHour[]> {
+  return apiRequest<RestaurantOpeningHour[]>(
+    `/restaurants/${restaurantId}/opening-hours`,
+    { method: 'GET', token },
+  );
+}
+
+export function updateOpeningHours(
+  token: string,
+  restaurantId: string,
+  days: Array<{
+    dayOfWeek: number;
+    opensAt: string;
+    closesAt: string;
+    isClosed: boolean;
+  }>,
+): Promise<RestaurantOpeningHour[]> {
+  return apiRequest<RestaurantOpeningHour[]>(
+    `/restaurants/${restaurantId}/opening-hours`,
+    { method: 'PATCH', token, body: JSON.stringify({ days }) },
+  );
+}
+

@@ -293,6 +293,12 @@ export default function RestaurantsPage() {
                       <div className="flex items-center gap-3">
                         <Link
                           className="text-sm font-medium text-zinc-900 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-500"
+                          href={`/dashboard/restaurants/${r.id}/settings`}
+                        >
+                          Settings
+                        </Link>
+                        <Link
+                          className="text-sm font-medium text-zinc-900 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-500"
                           href={`/dashboard/restaurants/${r.id}/tables`}
                         >
                           Tables

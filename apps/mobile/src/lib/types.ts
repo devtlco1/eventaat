@@ -31,6 +31,20 @@ export interface RestaurantDetail {
   isActive: boolean;
 }
 
+export interface RestaurantOperatingSettings {
+  id: string;
+  restaurantId: string;
+  defaultReservationDurationMinutes: number;
+  minPartySize: number;
+  maxPartySize: number | null;
+  manualApprovalRequired: boolean;
+  acceptsReservations: boolean;
+  advanceBookingDays: number;
+  sameDayCutoffMinutes: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AvailabilityTable {
   id: string;
   name: string;

@@ -6,6 +6,7 @@ import type {
   ReservationRecord,
   Restaurant,
   RestaurantDetail,
+  RestaurantOperatingSettings,
 } from './types';
 
 function baseUrl(): string {
@@ -80,6 +81,29 @@ export async function fetchRestaurantById(
     throw new Error(message);
   }
   return res.json() as Promise<RestaurantDetail>;
+}
+
+export async function fetchOperatingSettings(
+  accessToken: string,
+  restaurantId: string,
+): Promise<RestaurantOperatingSettings> {
+  const res = await fetch(
+    `${baseUrl()}/restaurants/${restaurantId}/operating-settings`,
+    { headers: authHeaders(accessToken) },
+  );
+  if (res.status === 401) {
+    throw new Error('Unauthorized (401) — sign in again.');
+  }
+  if (!res.ok) {
+    const message = await readErrorMessage(
+      res,
+      res.status === 404
+        ? 'Operating settings not found.'
+        : `Request failed (${res.status})`,
+    );
+    throw new Error(message);
+  }
+  return res.json() as Promise<RestaurantOperatingSettings>;
 }
 
 export type AvailabilityQuery = {

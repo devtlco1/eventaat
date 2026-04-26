@@ -14,6 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   createReservationRequest,
   fetchAvailability,
+  fetchOperatingSettings,
   fetchRestaurantById,
 } from '../lib/api';
 import type {
@@ -21,6 +22,7 @@ import type {
   BookingType,
   GuestType,
   RestaurantDetail,
+  RestaurantOperatingSettings,
   SeatingPreference,
 } from '../lib/types';
 import { RootStackParamList } from '../navigation/RootNavigator';
@@ -134,6 +136,9 @@ export function RestaurantDetailScreen({ route, navigation }: ScreenProps) {
   const { token, signOut } = useAuth();
 
   const [restaurant, setRestaurant] = useState<RestaurantDetail | null>(null);
+  const [operatingSettings, setOperatingSettings] = useState<RestaurantOperatingSettings | null>(
+    null,
+  );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadPending, setLoadPending] = useState(true);
 
@@ -166,13 +171,19 @@ export function RestaurantDetailScreen({ route, navigation }: ScreenProps) {
     setLoadError(null);
     setLoadPending(true);
     try {
-      const data = await fetchRestaurantById(token, restaurantId);
+      const [data, settings] = await Promise.all([
+        fetchRestaurantById(token, restaurantId),
+        fetchOperatingSettings(token, restaurantId),
+      ]);
       setRestaurant(data);
+      setOperatingSettings(settings);
+      setDurationStr(String(settings.defaultReservationDurationMinutes));
       navigation.setOptions({ title: data.name });
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to load restaurant';
       setLoadError(msg);
       setRestaurant(null);
+      setOperatingSettings(null);
       if (msg.includes('401')) {
         void signOut();
       }
@@ -296,6 +307,8 @@ export function RestaurantDetailScreen({ route, navigation }: ScreenProps) {
     return null;
   }
 
+  const acceptsReservations = operatingSettings?.acceptsReservations !== false;
+
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
       <Text style={styles.pageSectionLabel}>Restaurant</Text>
@@ -311,6 +324,15 @@ export function RestaurantDetailScreen({ route, navigation }: ScreenProps) {
           <Text style={styles.description}>{restaurant.description}</Text>
         ) : null}
       </View>
+
+      {operatingSettings && !operatingSettings.acceptsReservations ? (
+        <View style={styles.noticeCard} accessibilityRole="alert">
+          <Text style={styles.noticeTitle}>Reservations are off</Text>
+          <Text style={styles.noticeBody}>
+            This restaurant is not accepting new reservation requests right now.
+          </Text>
+        </View>
+      ) : null}
 
       {requestSuccess ? (
         <View style={styles.successCard}>
@@ -489,9 +511,12 @@ export function RestaurantDetailScreen({ route, navigation }: ScreenProps) {
         {formError ? <Text style={styles.formErrorText}>{formError}</Text> : null}
         {requestError ? <Text style={styles.formErrorText}>{requestError}</Text> : null}
         <Pressable
-          style={[styles.primaryBtn, requestSubmitting && styles.btnDisabled]}
+          style={[
+            styles.primaryBtn,
+            (requestSubmitting || !acceptsReservations) && styles.btnDisabled,
+          ]}
           onPress={() => void onSubmitReservation()}
-          disabled={requestSubmitting}
+          disabled={requestSubmitting || !acceptsReservations}
         >
           {requestSubmitting ? (
             <ActivityIndicator color="#fff" />
@@ -593,6 +618,16 @@ const styles = StyleSheet.create({
   heading: { fontSize: 22, fontWeight: '700', color: '#0f172a' },
   line: { marginTop: 6, fontSize: 16, color: '#334155' },
   description: { marginTop: 12, fontSize: 15, lineHeight: 22, color: '#475569' },
+  noticeCard: {
+    backgroundColor: '#fffbeb',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    marginBottom: 20,
+  },
+  noticeTitle: { fontSize: 16, fontWeight: '700', color: '#854d0e' },
+  noticeBody: { marginTop: 8, fontSize: 15, lineHeight: 22, color: '#a16207' },
   card: {
     backgroundColor: '#fff',
     borderRadius: 12,

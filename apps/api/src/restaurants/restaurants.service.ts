@@ -14,6 +14,8 @@ import {
   ReservationStatus,
   RestaurantTable,
   Role,
+  RestaurantOperatingSettings,
+  RestaurantOpeningHour,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SafeUser } from '../users/users.service';
@@ -24,6 +26,15 @@ import { CreateRestaurantTableDto } from './dto/create-restaurant-table.dto';
 import { UpdateRestaurantDto } from './dto/update-restaurant.dto';
 import { UpdateReservationStatusDto } from './dto/update-reservation-status.dto';
 import { UpdateRestaurantTableDto } from './dto/update-restaurant-table.dto';
+import { UpdateOperatingSettingsDto } from './dto/update-operating-settings.dto';
+import { UpdateOpeningHoursDto } from './dto/update-opening-hours.dto';
+import {
+  computeOpenCloseForLocalDay,
+  hhMmToMinutes,
+  isValidHhMm,
+  localCalendarDaysBetween,
+  startOfLocalDay,
+} from './operating-time.util';
 import type {
   AdminReservationView,
   AdminStatusHistoryEntry,
@@ -73,7 +84,22 @@ export class RestaurantsService {
   // ─── Core CRUD ────────────────────────────────────────────────────────────
 
   create(dto: CreateRestaurantDto): Promise<Restaurant> {
-    return this.prisma.restaurant.create({ data: dto });
+    return this.prisma.$transaction(async (tx) => {
+      const r = await tx.restaurant.create({ data: dto });
+      await tx.restaurantOperatingSettings.create({
+        data: { restaurantId: r.id },
+      });
+      await tx.restaurantOpeningHour.createMany({
+        data: [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
+          restaurantId: r.id,
+          dayOfWeek,
+          opensAt: '12:00',
+          closesAt: '23:00',
+          isClosed: false,
+        })),
+      });
+      return r;
+    });
   }
 
   /**
@@ -315,6 +341,250 @@ export class RestaurantsService {
     }
   }
 
+  private async assertCanViewOperatingSettings(
+    viewer: SafeUser,
+    restaurantId: string,
+  ): Promise<void> {
+    if (viewer.role === Role.CUSTOMER) {
+      await this.assertRestaurantVisible(restaurantId, viewer);
+      return;
+    }
+    if (viewer.role === Role.RESTAURANT_ADMIN) {
+      const r = await this.prisma.restaurant.findUnique({
+        where: { id: restaurantId },
+        select: { id: true },
+      });
+      if (!r) {
+        throw new NotFoundException('Restaurant not found');
+      }
+      if (!(await this.canManageRestaurant(viewer, restaurantId))) {
+        throw new ForbiddenException('You are not assigned to this restaurant');
+      }
+      return;
+    }
+    if (viewer.role === Role.PLATFORM_ADMIN) {
+      const r = await this.prisma.restaurant.findUnique({
+        where: { id: restaurantId },
+        select: { id: true },
+      });
+      if (!r) {
+        throw new NotFoundException('Restaurant not found');
+      }
+    }
+  }
+
+  // ─── Operating settings & opening hours ─────────────────────────────────
+
+  async getOperatingSettings(
+    restaurantId: string,
+    viewer: SafeUser,
+  ): Promise<RestaurantOperatingSettings> {
+    await this.assertCanViewOperatingSettings(viewer, restaurantId);
+    const s = await this.prisma.restaurantOperatingSettings.findUnique({
+      where: { restaurantId },
+    });
+    if (!s) {
+      throw new NotFoundException('Operating settings not found');
+    }
+    return s;
+  }
+
+  async updateOperatingSettings(
+    restaurantId: string,
+    dto: UpdateOperatingSettingsDto,
+    actor: SafeUser,
+  ): Promise<RestaurantOperatingSettings> {
+    await this.assertCanManageRestaurant(actor, restaurantId);
+    const existing = await this.prisma.restaurantOperatingSettings.findUnique({
+      where: { restaurantId },
+    });
+    if (!existing) {
+      throw new NotFoundException('Operating settings not found');
+    }
+    const nextMin = dto.minPartySize ?? existing.minPartySize;
+    const nextMax =
+      dto.maxPartySize !== undefined ? dto.maxPartySize : existing.maxPartySize;
+    if (nextMax != null && nextMax < nextMin) {
+      throw new UnprocessableEntityException(
+        'maxPartySize must be greater than or equal to minPartySize',
+      );
+    }
+    return this.prisma.restaurantOperatingSettings.update({
+      where: { restaurantId },
+      data: {
+        ...(dto.defaultReservationDurationMinutes !== undefined
+          ? { defaultReservationDurationMinutes: dto.defaultReservationDurationMinutes }
+          : {}),
+        ...(dto.minPartySize !== undefined
+          ? { minPartySize: dto.minPartySize }
+          : {}),
+        ...(dto.maxPartySize !== undefined
+          ? { maxPartySize: dto.maxPartySize }
+          : {}),
+        ...(dto.manualApprovalRequired !== undefined
+          ? { manualApprovalRequired: dto.manualApprovalRequired }
+          : {}),
+        ...(dto.acceptsReservations !== undefined
+          ? { acceptsReservations: dto.acceptsReservations }
+          : {}),
+        ...(dto.advanceBookingDays !== undefined
+          ? { advanceBookingDays: dto.advanceBookingDays }
+          : {}),
+        ...(dto.sameDayCutoffMinutes !== undefined
+          ? { sameDayCutoffMinutes: dto.sameDayCutoffMinutes }
+          : {}),
+      },
+    });
+  }
+
+  async getOpeningHours(
+    restaurantId: string,
+    viewer: SafeUser,
+  ): Promise<RestaurantOpeningHour[]> {
+    await this.assertCanViewOperatingSettings(viewer, restaurantId);
+    return this.prisma.restaurantOpeningHour.findMany({
+      where: { restaurantId },
+      orderBy: { dayOfWeek: 'asc' },
+    });
+  }
+
+  async updateOpeningHours(
+    restaurantId: string,
+    dto: UpdateOpeningHoursDto,
+    actor: SafeUser,
+  ): Promise<RestaurantOpeningHour[]> {
+    await this.assertCanManageRestaurant(actor, restaurantId);
+    const seen = new Set<number>();
+    for (const row of dto.days) {
+      if (seen.has(row.dayOfWeek)) {
+        throw new UnprocessableEntityException(
+          `Duplicate dayOfWeek: ${row.dayOfWeek}`,
+        );
+      }
+      seen.add(row.dayOfWeek);
+      if (!isValidHhMm(row.opensAt) || !isValidHhMm(row.closesAt)) {
+        throw new UnprocessableEntityException(
+          'opensAt and closesAt must be valid HH:mm (00:00–23:59)',
+        );
+      }
+      if (!row.isClosed) {
+        const o = hhMmToMinutes(row.opensAt);
+        const c = hhMmToMinutes(row.closesAt);
+        if (o !== null && c !== null && o >= c) {
+          throw new UnprocessableEntityException(
+            'opensAt must be before closesAt when the day is open',
+          );
+        }
+      }
+    }
+    if (seen.size !== 7) {
+      throw new UnprocessableEntityException(
+        'Provide exactly one entry for each day of week 0–6',
+      );
+    }
+    for (let d = 0; d <= 6; d++) {
+      if (!seen.has(d)) {
+        throw new UnprocessableEntityException(
+          `Missing dayOfWeek ${d} (0=Sun … 6=Sat)`,
+        );
+      }
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.restaurantOpeningHour.deleteMany({ where: { restaurantId } });
+      await tx.restaurantOpeningHour.createMany({
+        data: dto.days.map((row) => ({
+          restaurantId,
+          dayOfWeek: row.dayOfWeek,
+          opensAt: row.opensAt.trim(),
+          closesAt: row.closesAt.trim(),
+          isClosed: row.isClosed,
+        })),
+      });
+    });
+    return this.getOpeningHours(restaurantId, actor);
+  }
+
+  private async assertReservationMeetsOperatingRules(
+    restaurantId: string,
+    startAt: Date,
+    endAt: Date,
+    partySize: number,
+  ): Promise<void> {
+    const settings = await this.prisma.restaurantOperatingSettings.findUnique({
+      where: { restaurantId },
+    });
+    if (!settings) {
+      throw new UnprocessableEntityException('Restaurant has no operating settings');
+    }
+    if (!settings.acceptsReservations) {
+      throw new UnprocessableEntityException(
+        'This restaurant is not accepting reservation requests right now',
+      );
+    }
+    if (partySize < settings.minPartySize) {
+      throw new UnprocessableEntityException(
+        `Party size must be at least ${settings.minPartySize}`,
+      );
+    }
+    if (settings.maxPartySize != null && partySize > settings.maxPartySize) {
+      throw new UnprocessableEntityException(
+        `Party size must not exceed ${settings.maxPartySize}`,
+      );
+    }
+    const now = new Date();
+    const startDay = startOfLocalDay(startAt);
+    const daysFromToday = localCalendarDaysBetween(now, startAt);
+    if (daysFromToday < 0) {
+      throw new UnprocessableEntityException('startAt must be in the future');
+    }
+    if (daysFromToday > settings.advanceBookingDays) {
+      throw new UnprocessableEntityException(
+        `Reservations are only accepted up to ${settings.advanceBookingDays} days in advance (server local calendar)`,
+      );
+    }
+    if (startOfLocalDay(startAt).getTime() === startOfLocalDay(now).getTime()) {
+      const minStart = now.getTime() + settings.sameDayCutoffMinutes * 60 * 1000;
+      if (startAt.getTime() < minStart) {
+        throw new UnprocessableEntityException(
+          `For same-day requests, start time must be at least ${settings.sameDayCutoffMinutes} minutes from now`,
+        );
+      }
+    }
+    const dayOfWeek = startAt.getDay();
+    const hourRow = await this.prisma.restaurantOpeningHour.findUnique({
+      where: {
+        restaurantId_dayOfWeek: { restaurantId, dayOfWeek },
+      },
+    });
+    if (!hourRow) {
+      throw new UnprocessableEntityException('No opening hours for this day');
+    }
+    if (hourRow.isClosed) {
+      throw new UnprocessableEntityException(
+        'The restaurant is closed on the requested day',
+      );
+    }
+    const y = startAt.getFullYear();
+    const m = startAt.getMonth() + 1;
+    const d = startAt.getDate();
+    const { open, close, closed } = computeOpenCloseForLocalDay(
+      y,
+      m,
+      d,
+      hourRow.opensAt,
+      hourRow.closesAt,
+      hourRow.isClosed,
+    );
+    if (closed) {
+      throw new UnprocessableEntityException('The restaurant is closed on the requested day');
+    }
+    if (startAt.getTime() < open.getTime() || endAt.getTime() > close.getTime()) {
+      throw new UnprocessableEntityException(
+        'Reservation must fall within opening hours for that day (server local time; no per-venue timezone yet)',
+      );
+    }
+  }
+
   async createTable(
     restaurantId: string,
     dto: CreateRestaurantTableDto,
@@ -428,6 +698,13 @@ export class RestaurantsService {
     if (endAt.getTime() <= startAt.getTime()) {
       throw new UnprocessableEntityException('endAt must be after startAt');
     }
+
+    await this.assertReservationMeetsOperatingRules(
+      restaurantId,
+      startAt,
+      endAt,
+      dto.partySize,
+    );
 
     let tableId: string | null = null;
     if (dto.tableId) {
@@ -660,9 +937,6 @@ export class RestaurantsService {
       tables: Array<{ id: string; name: string; capacity: number }>;
     }>;
   }> {
-    const durationMinutes = query.durationMinutes ?? 90;
-
-    // Restaurant must exist and be active for availability.
     const restaurant = await this.prisma.restaurant.findUnique({
       where: { id: restaurantId },
       select: { id: true, isActive: true },
@@ -671,14 +945,64 @@ export class RestaurantsService {
       throw new NotFoundException('Restaurant not found');
     }
 
+    const settings = await this.prisma.restaurantOperatingSettings.findUnique({
+      where: { restaurantId },
+    });
+    if (!settings || !settings.acceptsReservations) {
+      return {
+        restaurantId,
+        date: query.date,
+        partySize: query.partySize,
+        durationMinutes: query.durationMinutes ?? 90,
+        slots: [],
+      };
+    }
+
+    const durationMinutes =
+      query.durationMinutes ?? settings.defaultReservationDurationMinutes;
+
     const [y, m, d] = query.date.split('-').map((x) => Number(x));
     if (!y || !m || !d) {
       throw new UnprocessableEntityException('Invalid date');
     }
 
-    // Operating hours: 12:00 -> 23:00 in server local time.
-    const openAt = new Date(y, m - 1, d, 12, 0, 0, 0);
-    const closeAt = new Date(y, m - 1, d, 23, 0, 0, 0);
+    const dayOfWeek = new Date(y, m - 1, d).getDay();
+    const hourRow = await this.prisma.restaurantOpeningHour.findUnique({
+      where: {
+        restaurantId_dayOfWeek: { restaurantId, dayOfWeek },
+      },
+    });
+
+    if (!hourRow || hourRow.isClosed) {
+      return {
+        restaurantId,
+        date: query.date,
+        partySize: query.partySize,
+        durationMinutes,
+        slots: [],
+      };
+    }
+
+    const { open, close, closed } = computeOpenCloseForLocalDay(
+      y,
+      m,
+      d,
+      hourRow.opensAt,
+      hourRow.closesAt,
+      hourRow.isClosed,
+    );
+    if (closed) {
+      return {
+        restaurantId,
+        date: query.date,
+        partySize: query.partySize,
+        durationMinutes,
+        slots: [],
+      };
+    }
+
+    const openAt = open;
+    const closeAt = close;
     if (isNaN(openAt.getTime()) || isNaN(closeAt.getTime())) {
       throw new UnprocessableEntityException('Invalid date');
     }
