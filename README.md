@@ -64,7 +64,7 @@ On every **push** or **pull request** to `main`, [`.github/workflows/ci.yml`](.g
 
 ## Project status
 
-Milestones in place: monorepo foundation; **API** (Nest, health) + **Prisma/PostgreSQL**; **auth** (JWT, register/login) and **RBAC**; **users** (platform management); **restaurants** (CRUD, assignments for restaurant admins); **request-based reservations** (optional table) with **availability** helper; **reservation status history** and lifecycle rules; **admin** (Next.js, webpack) and **mobile** (Expo) apps; **My Reservations**; **operating settings**; **customer cancellation** (eligible requests); **restaurant profile** metadata and contacts; **global request validation** (DTO / `ValidationPipe`); documented local workflow; **CI** (see above). **API usage & validation** detail: [apps/api/README.md#request-validation](apps/api/README.md#request-validation).
+Milestones in place: monorepo foundation; **API** (Nest, health) + **Prisma/PostgreSQL**; **auth** (JWT, register/login) and **RBAC**; **users** (platform management); **restaurants** (CRUD, assignments for restaurant admins); **request-based reservations** (optional table) with **availability** helper; **reservation status history** and lifecycle rules; **event nights (restaurant events)** with **platform approval** (PENDING → APPROVED/REJECTED) and **customer-only visibility** of approved, active, upcoming events; **admin** (Next.js, webpack) and **mobile** (Expo) apps; **My Reservations**; **operating settings**; **customer cancellation** (eligible requests); **restaurant profile** metadata and contacts; **global request validation** (DTO / `ValidationPipe`); documented local workflow; **CI** (see above). **API usage & validation** detail: [apps/api/README.md#request-validation](apps/api/README.md#request-validation).
 
 ## Current MVP capabilities
 
@@ -73,11 +73,12 @@ Milestones in place: monorepo foundation; **API** (Nest, health) + **Prisma/Post
 - **Customer** can **cancel** eligible requests (e.g. pending/held/confirmed, before start time) where rules allow
 - **Platform / restaurant admin** can manage **restaurants**, **assign restaurant admins**, and update **reservation status**
 - **Admin** can manage **operating settings** and **restaurant profile** (URLs, descriptions, **contacts**)
+- **Restaurant / platform admins** can create and manage **event nights**; **platform admins** **approve** or **reject** pending events; **customers** only see **approved, active, upcoming** events (admin UI: **Events** under each restaurant)
 - **CI** on `main` validates **API, admin, and mobile** (generate, typecheck, build) — [workflow](.github/workflows/ci.yml)
 
 ## Current recommended next work
 
-- Event nights foundation
+- Event **booking** flow (separate from table-request reservations) — *event nights are modeled and approved, but not bookable as events yet*
 - Offers (later)
 - Discovery / favorites (later)
 - Notifications (later)

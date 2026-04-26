@@ -7,6 +7,7 @@ import type {
   Restaurant,
   RestaurantContact,
   RestaurantDetail,
+  RestaurantEvent,
   RestaurantOperatingSettings,
 } from './types';
 
@@ -102,6 +103,26 @@ export async function fetchRestaurantContacts(
     throw new Error(message);
   }
   return res.json() as Promise<RestaurantContact[]>;
+}
+
+export async function fetchRestaurantEvents(
+  accessToken: string,
+  restaurantId: string,
+): Promise<RestaurantEvent[]> {
+  const res = await fetch(`${baseUrl()}/restaurants/${restaurantId}/events`, {
+    headers: authHeaders(accessToken),
+  });
+  if (res.status === 401) {
+    throw new Error('Unauthorized (401) — sign in again.');
+  }
+  if (!res.ok) {
+    const message = await readErrorMessage(
+      res,
+      res.status === 404 ? 'Events not found.' : `Request failed (${res.status})`,
+    );
+    throw new Error(message);
+  }
+  return res.json() as Promise<RestaurantEvent[]>;
 }
 
 export async function fetchOperatingSettings(

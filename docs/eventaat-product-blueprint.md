@@ -78,8 +78,9 @@ The following **exist in the current rebuilt system** and form the base for all 
 | **Restaurants** | CRUD (platform), listing, detail; active flag. |
 | **Restaurant admin assignments** | Many-to-many link: which `RESTAURANT_ADMIN` manages which restaurant. |
 | **Request-based reservations** | `tableId` optional; rich request fields; status workflow. |
-| **Mobile customer app** | Expo: login, restaurant list, detail, **reservation request** form, **My Reservations**. |
-| **Admin dashboard** | Next.js: restaurants, tables, users, admin assignments, **per-restaurant reservations** with status actions. |
+| **Event nights (foundation)** | `RestaurantEvent` with **PENDING** → **APPROVED/REJECTED** by **platform**; **customers** see only **APPROVED**, **active**, **upcoming** events. **Event booking** (reservations for an event) is not implemented yet. |
+| **Mobile customer app** | Expo: login, restaurant list, detail, **reservation request** form, **My Reservations**; event nights listed on **restaurant detail** when any approved events exist. |
+| **Admin dashboard** | Next.js: restaurants, tables, users, admin assignments, **per-restaurant events** (create, edit, review, deactivate), **per-restaurant reservations** with status actions. |
 | **My Reservations** | Customer list with embedded restaurant (and related data from API) and status. |
 | **Reservation status management** | Admins can move requests through the business states (see [§5](#5-reservation-lifecycle)). |
 
@@ -150,18 +151,20 @@ These support **search**, **filters**, and **cards** in discovery without changi
 
 ---
 
-## 8. Event Nights / Special Events (Future Major Module)
+## 8. Event Nights / Special Events (Foundation started)
 
-A **major** future product area: restaurants run **one-off or recurring events** (live music, set menus, themed nights).
+Restaurants can publish **one-off or recurring event nights** (live music, set menus, VIP nights, etc.).
 
 | Aspect | Product intent |
 |--------|----------------|
-| **Event entity** | Title, description, **date/time**, **price or free**, **capacity / seats**, what’s included. |
-| **Entertainment** | Artist / singer / act info (optional). |
-| **Booking** | **Event booking requests** parallel to table reservations: customer applies; restaurant **approves** or **declines**; status flow analogous to reservation lifecycle. |
-| **Link to kitchen** | **bookingType** / event flags already hint at this in reservation data; a full **Event** model comes later. |
+| **Event entity** (implemented) | `RestaurantEvent`: title, description, start/end, **PENDING/REJECTED/APPROVED** (+ **CANCELLED** in model), free/paid, capacity, **platform approval** before customers see a listing, optional URLs and menu/entertainment text. **Images:** URL fields only; uploads later. |
+| **Governance** | **Restaurant (or platform) admin** creates; status defaults to **PENDING**; only **platform admin** can **review** to **APPROVE** or **REJECT** (with reason). A **rejected** event that the restaurant **edits** returns to **PENDING** for a new review. **Deactivate** = soft hide (`isActive` false). |
+| **Customer visibility** | **Approved**, **active**, **upcoming** (`endsAt` after “now”) events only; only for **active** restaurants. |
+| **Entertainment** | Optional text (e.g. act / program). |
+| **Booking** | *Not in current phase.* **Event booking requests** (apply for a seat) will be parallel to table **reservation** requests, with a similar **status** story. |
+| **Link to kitchen** | `bookingType` in reservations still applies to **table** requests; **event** booking is a follow-on. |
 
-**Why it’s separate from MVP:** requires content management, capacity rules, and often deposits (see [§12](#12-payment--deposit-future-module)).
+**Not yet:** event-specific **booking** (dedicated request flow), deposits, notifications, image upload — see Offers, notifications, and payments sections below.
 
 ---
 
@@ -233,7 +236,7 @@ Events that should eventually notify users (push/email/SMS TBD):
 | **Review reservation requests** | Yes (per assigned restaurant) | — |
 | **Hold / confirm / reject / complete** | Yes (per product policy) | Stricter lifecycle rules in Phase 2 |
 | **Restaurant profile** | Basic fields | [§7](#7-restaurant-profile-future-modules) |
-| **Events / offers** | — | [§8](#8-event-nights--special-events-future-major-module), [§9](#9-offers-module-future) |
+| **Events / offers** | [§8](#8-event-nights--special-events-foundation-started): create events, **platform review**, customer visibility; **not** event booking | [§9](#9-offers-module-future) and richer events |
 
 ---
 
@@ -243,7 +246,7 @@ Events that should eventually notify users (push/email/SMS TBD):
 |-------|----------------|
 | **Now (MVP)** | Register / login, browse restaurants, open detail, **submit reservation request**, **My Reservations** with status. |
 | **Next** | Clearer **history** and **lifecycle** transparency (align with Phase 2). |
-| **Later** | **Events** browsing, **offers**, **favorites**, **rich discovery**. |
+| **Later** | **Event booking**, broad **offers** surfacing, **favorites**, **rich discovery**. (Approved event nights are listed on restaurant detail today; no event-specific booking yet.) |
 
 **Journey summary:** *find* → *request* → *track* → (future) *engage* with events and offers.
 
@@ -256,7 +259,7 @@ Events that should eventually notify users (push/email/SMS TBD):
 | **1** | **Reservation MVP** | Request-based model, mobile + admin, status workflow | **Largely complete** |
 | **2** | **Lifecycle hardening + history** | Status transition rules, audit or history records, better admin/customer visibility | **Next major engineering** |
 | **3** | **Restaurant profile completeness** | Photos, hours, links, tags—feeds discovery |
-| **4** | **Events / event nights** | Event entities + booking flow |
+| **4** | **Events / event nights** | **Foundation:** event entities, **platform approval**, customer list — **in progress; event booking** remains in this phase |
 | **5** | **Offers** | Content + basic surfacing |
 | **6** | **Discovery + favorites** | Filters, saved list |
 | **7** | **Notifications** | Timely, consented, reliable |

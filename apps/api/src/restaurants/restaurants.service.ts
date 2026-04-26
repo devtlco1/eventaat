@@ -14,6 +14,7 @@ import {
   ReservationStatus,
   RestaurantContact,
   RestaurantContactType,
+  RestaurantEventStatus,
   RestaurantTable,
   Role,
   RestaurantOperatingSettings,
@@ -34,6 +35,10 @@ import { CancelMyReservationDto } from './dto/cancel-my-reservation.dto';
 import { CreateRestaurantContactDto } from './dto/create-restaurant-contact.dto';
 import { UpdateRestaurantContactDto } from './dto/update-restaurant-contact.dto';
 import { UpdateRestaurantProfileDto } from './dto/update-restaurant-profile.dto';
+import { CreateRestaurantEventDto } from './dto/create-restaurant-event.dto';
+import { UpdateRestaurantEventDto } from './dto/update-restaurant-event.dto';
+import { ReviewRestaurantEventDto } from './dto/review-restaurant-event.dto';
+import { ListRestaurantEventsQueryDto } from './dto/list-restaurant-events-query.dto';
 import {
   computeOpenCloseForLocalDay,
   hhMmToMinutes,
@@ -248,6 +253,11 @@ export class RestaurantsService {
     ReservationStatus.HELD,
     ReservationStatus.CONFIRMED,
   ];
+
+  private static readonly eventInclude = {
+    createdBy: { select: { id: true, fullName: true, email: true } },
+    approvedBy: { select: { id: true, fullName: true, email: true } },
+  } as const;
 
   /**
    * Removes an admin assignment.
@@ -1412,5 +1422,349 @@ export class RestaurantsService {
       durationMinutes,
       slots,
     };
+  }
+
+  // ─── Restaurant events (Event Nights) ────────────────────────────────────
+
+  private assertEventTimeOrder(startsAt: Date, endsAt: Date): void {
+    if (endsAt.getTime() <= startsAt.getTime()) {
+      throw new BadRequestException('endsAt must be after startsAt');
+    }
+  }
+
+  private toRestaurantEventResponse(
+    e: Prisma.RestaurantEventGetPayload<{
+      include: typeof RestaurantsService.eventInclude;
+    }>,
+  ) {
+    return {
+      ...e,
+      price: e.price == null ? null : e.price.toString(),
+    };
+  }
+
+  private buildRestaurantEventListWhere(
+    restaurantId: string,
+    query: ListRestaurantEventsQueryDto,
+  ): Prisma.RestaurantEventWhereInput {
+    const w: Prisma.RestaurantEventWhereInput = { restaurantId };
+    if (query.status) w.status = query.status;
+    if (query.activeOnly === true) w.isActive = true;
+    if (query.upcomingOnly === true) {
+      w.endsAt = { gt: new Date() };
+    }
+    return w;
+  }
+
+  async listRestaurantEvents(
+    restaurantId: string,
+    query: ListRestaurantEventsQueryDto,
+    viewer: SafeUser,
+  ) {
+    if (viewer.role === Role.CUSTOMER) {
+      await this.assertRestaurantVisible(restaurantId, viewer);
+      const rows = await this.prisma.restaurantEvent.findMany({
+        where: {
+          restaurantId,
+          status: RestaurantEventStatus.APPROVED,
+          isActive: true,
+          endsAt: { gt: new Date() },
+        },
+        orderBy: { startsAt: 'asc' },
+        include: RestaurantsService.eventInclude,
+      });
+      return rows.map((e) => this.toRestaurantEventResponse(e));
+    }
+
+    if (viewer.role === Role.PLATFORM_ADMIN) {
+      await this.assertRestaurantExists(restaurantId);
+    } else {
+      await this.assertCanManageRestaurant(viewer, restaurantId);
+    }
+    const where = this.buildRestaurantEventListWhere(restaurantId, query);
+    const rows = await this.prisma.restaurantEvent.findMany({
+      where,
+      orderBy: { startsAt: 'asc' },
+      include: RestaurantsService.eventInclude,
+    });
+    return rows.map((e) => this.toRestaurantEventResponse(e));
+  }
+
+  async getRestaurantEvent(
+    restaurantId: string,
+    eventId: string,
+    viewer: SafeUser,
+  ) {
+    if (viewer.role === Role.CUSTOMER) {
+      await this.assertRestaurantVisible(restaurantId, viewer);
+      const e = await this.prisma.restaurantEvent.findFirst({
+        where: {
+          id: eventId,
+          restaurantId,
+          status: RestaurantEventStatus.APPROVED,
+          isActive: true,
+          endsAt: { gt: new Date() },
+        },
+        include: RestaurantsService.eventInclude,
+      });
+      if (!e) throw new NotFoundException('Event not found');
+      return this.toRestaurantEventResponse(e);
+    }
+
+    if (viewer.role === Role.PLATFORM_ADMIN) {
+      await this.assertRestaurantExists(restaurantId);
+    } else {
+      await this.assertCanManageRestaurant(viewer, restaurantId);
+    }
+    const e = await this.prisma.restaurantEvent.findFirst({
+      where: { id: eventId, restaurantId },
+      include: RestaurantsService.eventInclude,
+    });
+    if (!e) throw new NotFoundException('Event not found');
+    return this.toRestaurantEventResponse(e);
+  }
+
+  async createRestaurantEvent(
+    restaurantId: string,
+    dto: CreateRestaurantEventDto,
+    actor: SafeUser,
+  ) {
+    if (actor.role === Role.CUSTOMER) {
+      throw new ForbiddenException('Insufficient role');
+    }
+    await this.assertCanManageRestaurant(actor, restaurantId);
+
+    const startsAt = new Date(dto.startsAt);
+    const endsAt = new Date(dto.endsAt);
+    this.assertEventTimeOrder(startsAt, endsAt);
+
+    const isFree = dto.isFree !== undefined ? dto.isFree : true;
+    const e = await this.prisma.restaurantEvent.create({
+      data: {
+        restaurantId,
+        title: dto.title,
+        description: dto.description,
+        startsAt,
+        endsAt,
+        status: RestaurantEventStatus.PENDING,
+        isActive: dto.isActive !== undefined ? dto.isActive : true,
+        isFree,
+        price: isFree || dto.price == null ? null : new Prisma.Decimal(dto.price),
+        currency: dto.currency?.trim() || 'IQD',
+        capacity: dto.capacity,
+        seatsAvailableNote: dto.seatsAvailableNote,
+        specialMenuDescription: dto.specialMenuDescription,
+        specialMenuUrl: dto.specialMenuUrl,
+        whatIsIncluded: dto.whatIsIncluded,
+        entertainmentInfo: dto.entertainmentInfo,
+        coverImageUrl: dto.coverImageUrl,
+        galleryImageUrls: dto.galleryImageUrls != null
+          ? (dto.galleryImageUrls as Prisma.InputJsonValue)
+          : undefined,
+        createdByUserId: actor.id,
+      },
+      include: RestaurantsService.eventInclude,
+    });
+    return this.toRestaurantEventResponse(e);
+  }
+
+  async updateRestaurantEvent(
+    restaurantId: string,
+    eventId: string,
+    dto: UpdateRestaurantEventDto,
+    actor: SafeUser,
+  ) {
+    if (actor.role === Role.CUSTOMER) {
+      throw new ForbiddenException('Insufficient role');
+    }
+
+    const isPlatform = actor.role === Role.PLATFORM_ADMIN;
+    if (!isPlatform) {
+      await this.assertCanManageRestaurant(actor, restaurantId);
+    } else {
+      await this.assertRestaurantExists(restaurantId);
+    }
+
+    const event = await this.prisma.restaurantEvent.findFirst({
+      where: { id: eventId, restaurantId },
+    });
+    if (!event) {
+      throw new NotFoundException('Event not found');
+    }
+
+    if (actor.role === Role.RESTAURANT_ADMIN) {
+      if (
+        event.status === RestaurantEventStatus.APPROVED ||
+        event.status === RestaurantEventStatus.CANCELLED
+      ) {
+        throw new ForbiddenException(
+          'Events can be edited in this state only as platform admin',
+        );
+      }
+    }
+
+    const data: Prisma.RestaurantEventUpdateInput = {};
+    if (dto.title !== undefined) data.title = dto.title;
+    if (dto.description !== undefined) data.description = dto.description;
+    if (dto.seatsAvailableNote !== undefined) {
+      data.seatsAvailableNote = dto.seatsAvailableNote;
+    }
+    if (dto.specialMenuDescription !== undefined) {
+      data.specialMenuDescription = dto.specialMenuDescription;
+    }
+    if (dto.specialMenuUrl !== undefined) data.specialMenuUrl = dto.specialMenuUrl;
+    if (dto.whatIsIncluded !== undefined) {
+      data.whatIsIncluded = dto.whatIsIncluded;
+    }
+    if (dto.entertainmentInfo !== undefined) {
+      data.entertainmentInfo = dto.entertainmentInfo;
+    }
+    if (dto.coverImageUrl !== undefined) {
+      data.coverImageUrl = dto.coverImageUrl;
+    }
+    if (dto.currency !== undefined) {
+      data.currency = dto.currency.trim() || 'IQD';
+    }
+    if (dto.capacity !== undefined) {
+      data.capacity = dto.capacity;
+    }
+    if (dto.isActive !== undefined) data.isActive = dto.isActive;
+    if (dto.isFree !== undefined) data.isFree = dto.isFree;
+    if (dto.isFree === true) {
+      data.price = null;
+    } else if (dto.price !== undefined) {
+      data.price = new Prisma.Decimal(dto.price);
+    }
+    if (dto.galleryImageUrls !== undefined) {
+      data.galleryImageUrls = dto.galleryImageUrls as Prisma.InputJsonValue;
+    }
+
+    const mergedStart = dto.startsAt
+      ? new Date(dto.startsAt)
+      : event.startsAt;
+    const mergedEnd = dto.endsAt
+      ? new Date(dto.endsAt)
+      : event.endsAt;
+    if (dto.startsAt !== undefined || dto.endsAt !== undefined) {
+      this.assertEventTimeOrder(mergedStart, mergedEnd);
+    }
+    if (dto.startsAt !== undefined) data.startsAt = mergedStart;
+    if (dto.endsAt !== undefined) data.endsAt = mergedEnd;
+
+    if (
+      actor.role === Role.RESTAURANT_ADMIN &&
+      event.status === RestaurantEventStatus.REJECTED
+    ) {
+      data.status = RestaurantEventStatus.PENDING;
+      data.rejectionReason = null;
+      data.approvedAt = null;
+      data.approvedBy = { disconnect: true };
+    }
+
+    const allKeys: (keyof UpdateRestaurantEventDto)[] = [
+      'title',
+      'description',
+      'startsAt',
+      'endsAt',
+      'isActive',
+      'isFree',
+      'price',
+      'currency',
+      'capacity',
+      'seatsAvailableNote',
+      'specialMenuDescription',
+      'specialMenuUrl',
+      'whatIsIncluded',
+      'entertainmentInfo',
+      'coverImageUrl',
+      'galleryImageUrls',
+    ];
+    const isEmpty = !allKeys.some((k) => dto[k] !== undefined) &&
+      !(
+        actor.role === Role.RESTAURANT_ADMIN &&
+        event.status === RestaurantEventStatus.REJECTED
+      );
+    if (isEmpty) {
+      return this.getRestaurantEvent(restaurantId, eventId, actor);
+    }
+
+    const e = await this.prisma.restaurantEvent.update({
+      where: { id: eventId },
+      data,
+      include: RestaurantsService.eventInclude,
+    });
+    return this.toRestaurantEventResponse(e);
+  }
+
+  async reviewRestaurantEvent(
+    restaurantId: string,
+    eventId: string,
+    dto: ReviewRestaurantEventDto,
+    actor: SafeUser,
+  ) {
+    if (actor.role !== Role.PLATFORM_ADMIN) {
+      throw new ForbiddenException('Insufficient role');
+    }
+    await this.assertRestaurantExists(restaurantId);
+
+    const event = await this.prisma.restaurantEvent.findFirst({
+      where: { id: eventId, restaurantId },
+    });
+    if (!event) {
+      throw new NotFoundException('Event not found');
+    }
+    if (event.status !== RestaurantEventStatus.PENDING) {
+      throw new BadRequestException('Only PENDING events can be reviewed');
+    }
+
+    if (dto.status === RestaurantEventStatus.APPROVED) {
+      const e = await this.prisma.restaurantEvent.update({
+        where: { id: eventId },
+        data: {
+          status: RestaurantEventStatus.APPROVED,
+          approvedAt: new Date(),
+          approvedBy: { connect: { id: actor.id } },
+          rejectionReason: null,
+        },
+        include: RestaurantsService.eventInclude,
+      });
+      return this.toRestaurantEventResponse(e);
+    }
+
+    const reason =
+      dto.rejectionReason?.trim() || 'Rejected by platform';
+
+    const e = await this.prisma.restaurantEvent.update({
+      where: { id: eventId },
+      data: {
+        status: RestaurantEventStatus.REJECTED,
+        approvedAt: null,
+        approvedBy: { disconnect: true },
+        rejectionReason: reason,
+      },
+      include: RestaurantsService.eventInclude,
+    });
+    return this.toRestaurantEventResponse(e);
+  }
+
+  async deactivateRestaurantEvent(
+    restaurantId: string,
+    eventId: string,
+    actor: SafeUser,
+  ): Promise<void> {
+    if (actor.role === Role.CUSTOMER) {
+      throw new ForbiddenException('Insufficient role');
+    }
+    await this.assertCanManageRestaurant(actor, restaurantId);
+    const event = await this.prisma.restaurantEvent.findFirst({
+      where: { id: eventId, restaurantId },
+    });
+    if (!event) {
+      throw new NotFoundException('Event not found');
+    }
+    await this.prisma.restaurantEvent.update({
+      where: { id: eventId },
+      data: { isActive: false },
+    });
   }
 }

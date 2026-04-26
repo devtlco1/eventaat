@@ -57,6 +57,13 @@ enum RestaurantContactType {
   OTHER
 }
 
+enum RestaurantEventStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
@@ -71,6 +78,8 @@ model User {
   restaurantAssignments RestaurantAdmin[]
   reservations                 Reservation[]
   reservationStatusAsActor     ReservationStatusHistory[] @relation("ReservationStatusChangeActor")
+  eventsCreated                RestaurantEvent[]         @relation("EventCreatedBy")
+  eventsApproved               RestaurantEvent[]         @relation("EventApprovedBy")
 
   @@map("users")
 }
@@ -105,8 +114,47 @@ model Restaurant {
   operatingSettings RestaurantOperatingSettings?
   openingHours     RestaurantOpeningHour[]
   contacts         RestaurantContact[]
+  events           RestaurantEvent[]
 
   @@map("restaurants")
+}
+
+/// Special event night (singer, VIP dinner, etc.). Public listing requires APPROVED + isActive; booking is a future step.
+model RestaurantEvent {
+  id        String  @id @default(uuid()) @db.Uuid
+  restaurantId String @map("restaurant_id") @db.Uuid
+  title     String
+  description String?
+  startsAt  DateTime @map("starts_at")
+  endsAt    DateTime @map("ends_at")
+  status    RestaurantEventStatus @default(PENDING)
+  isActive  Boolean @default(true) @map("is_active")
+  isFree    Boolean @default(true) @map("is_free")
+  price     Decimal? @map("price") @db.Decimal(14, 2)
+  currency  String  @default("IQD") @map("currency") @db.VarChar(8)
+  capacity  Int?    @map("capacity")
+  seatsAvailableNote String? @map("seats_available_note")
+  specialMenuDescription String? @map("special_menu_description")
+  specialMenuUrl  String? @map("special_menu_url") @db.VarChar(2048)
+  whatIsIncluded  String? @map("what_is_included")
+  entertainmentInfo String? @map("entertainment_info")
+  coverImageUrl  String? @map("cover_image_url") @db.VarChar(2048)
+  galleryImageUrls Json?  @map("gallery_image_urls")
+  rejectionReason String? @map("rejection_reason")
+  approvedAt      DateTime? @map("approved_at")
+  approvedByUserId String? @map("approved_by_user_id") @db.Uuid
+  createdByUserId String? @map("created_by_user_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  restaurant  Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  approvedBy  User?      @relation("EventApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  createdBy   User?      @relation("EventCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId])
+  @@index([restaurantId, status])
+  @@index([startsAt])
+  @@map("restaurant_events")
 }
 
 /// Business rules and defaults for requests (one row per restaurant).

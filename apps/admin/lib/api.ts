@@ -557,3 +557,129 @@ export function deleteRestaurantContact(
   });
 }
 
+export type RestaurantEventStatus =
+  | 'PENDING'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'CANCELLED';
+
+export type RestaurantEvent = {
+  id: string;
+  restaurantId: string;
+  title: string;
+  description: string | null;
+  startsAt: string;
+  endsAt: string;
+  status: RestaurantEventStatus;
+  isActive: boolean;
+  isFree: boolean;
+  price: string | null;
+  currency: string;
+  capacity: number | null;
+  seatsAvailableNote: string | null;
+  specialMenuDescription: string | null;
+  specialMenuUrl: string | null;
+  whatIsIncluded: string | null;
+  entertainmentInfo: string | null;
+  coverImageUrl: string | null;
+  galleryImageUrls: string[] | null;
+  rejectionReason: string | null;
+  approvedAt: string | null;
+  approvedByUserId: string | null;
+  createdByUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: { id: string; fullName: string; email: string } | null;
+  approvedBy: { id: string; fullName: string; email: string } | null;
+};
+
+export function listRestaurantEvents(
+  token: string,
+  restaurantId: string,
+  query: {
+    status?: RestaurantEventStatus;
+    activeOnly?: boolean;
+    upcomingOnly?: boolean;
+  } = {},
+): Promise<RestaurantEvent[]> {
+  const params = new URLSearchParams();
+  if (query.status) params.set('status', query.status);
+  if (typeof query.activeOnly === 'boolean') {
+    params.set('activeOnly', String(query.activeOnly));
+  }
+  if (typeof query.upcomingOnly === 'boolean') {
+    params.set('upcomingOnly', String(query.upcomingOnly));
+  }
+  const qs = params.toString();
+  return apiRequest<RestaurantEvent[]>(
+    `/restaurants/${restaurantId}/events${qs ? `?${qs}` : ''}`,
+    { method: 'GET', token },
+  );
+}
+
+export type CreateRestaurantEventInput = {
+  title: string;
+  description?: string;
+  startsAt: string;
+  endsAt: string;
+  isActive?: boolean;
+  isFree?: boolean;
+  price?: number;
+  currency?: string;
+  capacity?: number;
+  seatsAvailableNote?: string;
+  specialMenuDescription?: string;
+  specialMenuUrl?: string;
+  whatIsIncluded?: string;
+  entertainmentInfo?: string;
+  coverImageUrl?: string;
+  galleryImageUrls?: string[];
+};
+
+export function createRestaurantEvent(
+  token: string,
+  restaurantId: string,
+  input: CreateRestaurantEventInput,
+): Promise<RestaurantEvent> {
+  return apiRequest<RestaurantEvent>(`/restaurants/${restaurantId}/events`, {
+    method: 'POST',
+    token,
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateRestaurantEvent(
+  token: string,
+  restaurantId: string,
+  eventId: string,
+  input: Partial<CreateRestaurantEventInput>,
+): Promise<RestaurantEvent> {
+  return apiRequest<RestaurantEvent>(
+    `/restaurants/${restaurantId}/events/${eventId}`,
+    { method: 'PATCH', token, body: JSON.stringify(input) },
+  );
+}
+
+export function reviewRestaurantEvent(
+  token: string,
+  restaurantId: string,
+  eventId: string,
+  input: { status: 'APPROVED' | 'REJECTED'; rejectionReason?: string },
+): Promise<RestaurantEvent> {
+  return apiRequest<RestaurantEvent>(
+    `/restaurants/${restaurantId}/events/${eventId}/review`,
+    { method: 'PATCH', token, body: JSON.stringify(input) },
+  );
+}
+
+export function deactivateRestaurantEvent(
+  token: string,
+  restaurantId: string,
+  eventId: string,
+): Promise<void> {
+  return apiRequest<void>(`/restaurants/${restaurantId}/events/${eventId}`, {
+    method: 'DELETE',
+    token,
+  });
+}
+

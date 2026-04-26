@@ -33,6 +33,10 @@ import { CreateRestaurantContactDto } from './dto/create-restaurant-contact.dto'
 import { UpdateReservationStatusDto } from './dto/update-reservation-status.dto';
 import { UpdateRestaurantContactDto } from './dto/update-restaurant-contact.dto';
 import { UpdateRestaurantProfileDto } from './dto/update-restaurant-profile.dto';
+import { CreateRestaurantEventDto } from './dto/create-restaurant-event.dto';
+import { ListRestaurantEventsQueryDto } from './dto/list-restaurant-events-query.dto';
+import { UpdateRestaurantEventDto } from './dto/update-restaurant-event.dto';
+import { ReviewRestaurantEventDto } from './dto/review-restaurant-event.dto';
 import { UpdateRestaurantDto } from './dto/update-restaurant.dto';
 import { UpdateRestaurantTableDto } from './dto/update-restaurant-table.dto';
 import { UpdateOpeningHoursDto } from './dto/update-opening-hours.dto';
@@ -173,6 +177,83 @@ export class RestaurantsController {
     return this.restaurants.deleteRestaurantContact(
       restaurantId,
       contactId,
+      user,
+    );
+  }
+
+  // ─── Restaurant events (Event Nights) ─────────────────────────────────
+
+  @Get(':restaurantId/events')
+  listEvents(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @Query() query: ListRestaurantEventsQueryDto,
+    @CurrentUser() user: SafeUser,
+  ) {
+    return this.restaurants.listRestaurantEvents(restaurantId, query, user);
+  }
+
+  @Post(':restaurantId/events')
+  @Roles('PLATFORM_ADMIN', 'RESTAURANT_ADMIN')
+  createEvent(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @Body() dto: CreateRestaurantEventDto,
+    @CurrentUser() user: SafeUser,
+  ) {
+    return this.restaurants.createRestaurantEvent(restaurantId, dto, user);
+  }
+
+  @Get(':restaurantId/events/:eventId')
+  getEvent(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @Param('eventId', new ParseUUIDPipe()) eventId: string,
+    @CurrentUser() user: SafeUser,
+  ) {
+    return this.restaurants.getRestaurantEvent(restaurantId, eventId, user);
+  }
+
+  @Patch(':restaurantId/events/:eventId/review')
+  @Roles('PLATFORM_ADMIN')
+  reviewEvent(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @Param('eventId', new ParseUUIDPipe()) eventId: string,
+    @Body() dto: ReviewRestaurantEventDto,
+    @CurrentUser() user: SafeUser,
+  ) {
+    return this.restaurants.reviewRestaurantEvent(
+      restaurantId,
+      eventId,
+      dto,
+      user,
+    );
+  }
+
+  @Patch(':restaurantId/events/:eventId')
+  @Roles('PLATFORM_ADMIN', 'RESTAURANT_ADMIN')
+  updateEvent(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @Param('eventId', new ParseUUIDPipe()) eventId: string,
+    @Body() dto: UpdateRestaurantEventDto,
+    @CurrentUser() user: SafeUser,
+  ) {
+    return this.restaurants.updateRestaurantEvent(
+      restaurantId,
+      eventId,
+      dto,
+      user,
+    );
+  }
+
+  @Delete(':restaurantId/events/:eventId')
+  @Roles('PLATFORM_ADMIN', 'RESTAURANT_ADMIN')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  deactivateEvent(
+    @Param('restaurantId', new ParseUUIDPipe()) restaurantId: string,
+    @Param('eventId', new ParseUUIDPipe()) eventId: string,
+    @CurrentUser() user: SafeUser,
+  ): Promise<void> {
+    return this.restaurants.deactivateRestaurantEvent(
+      restaurantId,
+      eventId,
       user,
     );
   }

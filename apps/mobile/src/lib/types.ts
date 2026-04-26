@@ -58,6 +58,37 @@ export interface RestaurantContact {
   updatedAt: string;
 }
 
+/** Public event row from GET /restaurants/:id/events (customer sees approved only). */
+export interface RestaurantEvent {
+  id: string;
+  restaurantId: string;
+  title: string;
+  description: string | null;
+  startsAt: string;
+  endsAt: string;
+  status: string;
+  isActive: boolean;
+  isFree: boolean;
+  price: string | null;
+  currency: string;
+  capacity: number | null;
+  seatsAvailableNote: string | null;
+  specialMenuDescription: string | null;
+  specialMenuUrl: string | null;
+  whatIsIncluded: string | null;
+  entertainmentInfo: string | null;
+  coverImageUrl: string | null;
+  galleryImageUrls: unknown;
+  rejectionReason: string | null;
+  approvedAt: string | null;
+  approvedByUserId: string | null;
+  createdByUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: { id: string; fullName: string; email: string } | null;
+  approvedBy: { id: string; fullName: string; email: string } | null;
+}
+
 export interface RestaurantOperatingSettings {
   id: string;
   restaurantId: string;

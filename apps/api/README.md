@@ -38,6 +38,14 @@ curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:4000/auth/login 
 | PATCH  | `/restaurants/:id`  | Bearer + `PLATFORM_ADMIN`             |
 | GET    | `/health`           | public                                |
 
+### Restaurant event nights
+
+Under each restaurant, scoped routes (all require Bearer; **customers** get **approved / active / upcoming** events only; **review** is **platform** only). Migration: `add_restaurant_events` (Prisma: `restaurant_events` table).
+
+- `GET|POST /restaurants/:restaurantId/events` — list / create (create: **restaurant** or **platform** admin, assignment applies).
+- `GET|PATCH|DELETE /restaurants/:restaurantId/events/:eventId` — get / update / soft-deactivate (DELETE sets `isActive=false`; it does not remove the row).
+- `PATCH /restaurants/:restaurantId/events/:eventId/review` — `APPROVE` or `REJECT` **PENDING** only (platform only).
+
 ## Local setup
 
 Use **Node.js 22** in this monorepo (root `.nvmrc` and [root README setup](../../README.md#node-22-local). Paths below assume a clone of the repository.)
