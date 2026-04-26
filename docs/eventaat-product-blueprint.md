@@ -79,7 +79,7 @@ The following **exist in the current rebuilt system** and form the base for all 
 | **Restaurant admin assignments** | Many-to-many link: which `RESTAURANT_ADMIN` manages which restaurant. |
 | **Request-based reservations** | `tableId` optional; rich request fields; status workflow. |
 | **Event nights (foundation)** | `RestaurantEvent` with **PENDING** → **APPROVED/REJECTED** by **platform**; **customers** see only **APPROVED**, **active**, **upcoming** events. **Event booking** (reservations for an event) is not implemented yet. |
-| **Mobile customer app** | Expo: login, restaurant list, detail, **reservation request** form, **My Reservations**; event nights listed on **restaurant detail** when any approved events exist. |
+| **Mobile customer app** | Expo: **Home** is **events-first**, then **restaurants**; **Event detail** vs **Restaurant detail** are separate entry points (no mixed booking context). **Table reservation request** form only on **Restaurant detail**; **Event detail** shows a disabled / “coming soon” event booking CTA until a dedicated event reservation step ships. **My Reservations** for table requests. |
 | **Admin dashboard** | Next.js: restaurants, tables, users, admin assignments, **per-restaurant events** (create, edit, review, deactivate), **per-restaurant reservations** with status actions. |
 | **My Reservations** | Customer list with embedded restaurant (and related data from API) and status. |
 | **Reservation status management** | Admins can move requests through the business states (see [§5](#5-reservation-lifecycle)). |
@@ -244,7 +244,7 @@ Events that should eventually notify users (push/email/SMS TBD):
 
 | Stage | Capabilities |
 |-------|----------------|
-| **Now (MVP)** | Register / login, browse restaurants, open detail, **submit reservation request**, **My Reservations** with status. |
+| **Now (MVP)** | Register / login, **Home** (events then restaurants), **Event detail** (browse only; event booking TBD), **Restaurant detail** + **submit table reservation request**, **My Reservations** with status. |
 | **Next** | Clearer **history** and **lifecycle** transparency (align with Phase 2). |
 | **Later** | **Event booking**, broad **offers** surfacing, **favorites**, **rich discovery**. (Approved event nights are listed on restaurant detail today; no event-specific booking yet.) |
 

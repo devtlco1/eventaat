@@ -11,13 +11,13 @@ import {
 } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
+import { type RestaurantBookingContext } from '../lib/bookingContext';
 import {
   createReservationRequest,
   fetchAvailability,
   fetchOperatingSettings,
   fetchRestaurantById,
   fetchRestaurantContacts,
-  fetchRestaurantEvents,
 } from '../lib/api';
 import type {
   AvailabilityResponse,
@@ -25,7 +25,6 @@ import type {
   GuestType,
   RestaurantContact,
   RestaurantDetail,
-  RestaurantEvent,
   RestaurantOperatingSettings,
   SeatingPreference,
 } from '../lib/types';
@@ -96,25 +95,6 @@ function formatTimeRange(isoStart: string, isoEnd: string): { start: string; end
   }
 }
 
-function formatEventDateTimeRange(isoStart: string, isoEnd: string): string {
-  const opt: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeStyle: 'short' };
-  try {
-    return `${new Date(isoStart).toLocaleString(undefined, opt)} – ${new Date(isoEnd).toLocaleString(
-      undefined,
-      opt,
-    )}`;
-  } catch {
-    return `${isoStart} – ${isoEnd}`;
-  }
-}
-
-function galleryAsStrings(g: unknown): string[] {
-  if (Array.isArray(g) && g.every((x) => typeof x === 'string')) {
-    return g;
-  }
-  return [];
-}
-
 type ParsedAvailabilityForm = { date: string; partySize: number; durationMinutes: number };
 
 function buildReservationWindow(
@@ -158,9 +138,15 @@ export function RestaurantDetailScreen({ route, navigation }: ScreenProps) {
   const { restaurantId } = route.params;
   const { token, signOut } = useAuth();
 
+  // Table / normal reservation only — not eventId. For events use EventDetail.
+  const _restaurantBooking: RestaurantBookingContext = {
+    type: 'RESTAURANT',
+    restaurantId,
+  };
+  void _restaurantBooking;
+
   const [restaurant, setRestaurant] = useState<RestaurantDetail | null>(null);
   const [contacts, setContacts] = useState<RestaurantContact[]>([]);
-  const [restaurantEvents, setRestaurantEvents] = useState<RestaurantEvent[]>([]);
   const [operatingSettings, setOperatingSettings] = useState<RestaurantOperatingSettings | null>(
     null,
   );
@@ -196,16 +182,14 @@ export function RestaurantDetailScreen({ route, navigation }: ScreenProps) {
     setLoadError(null);
     setLoadPending(true);
     try {
-      const [data, cList, settings, eventsList] = await Promise.all([
+      const [data, cList, settings] = await Promise.all([
         fetchRestaurantById(token, restaurantId),
         fetchRestaurantContacts(token, restaurantId),
         fetchOperatingSettings(token, restaurantId),
-        fetchRestaurantEvents(token, restaurantId),
       ]);
       setRestaurant(data);
       setContacts(cList);
       setOperatingSettings(settings);
-      setRestaurantEvents(eventsList);
       setDurationStr(String(settings.defaultReservationDurationMinutes));
       navigation.setOptions({ title: data.name });
     } catch (e) {
@@ -213,7 +197,6 @@ export function RestaurantDetailScreen({ route, navigation }: ScreenProps) {
       setLoadError(msg);
       setRestaurant(null);
       setContacts([]);
-      setRestaurantEvents([]);
       setOperatingSettings(null);
       if (msg.includes('401')) {
         void signOut();
@@ -382,57 +365,6 @@ export function RestaurantDetailScreen({ route, navigation }: ScreenProps) {
           <Text style={styles.description}>{restaurant.profileDescription}</Text>
         ) : null}
       </View>
-
-      {restaurantEvents.length > 0 ? (
-        <>
-          <Text style={styles.pageSectionLabel}>Event nights</Text>
-          {restaurantEvents.map((ev) => {
-            const gallery = galleryAsStrings(ev.galleryImageUrls);
-            return (
-              <View key={ev.id} style={styles.card}>
-                <Text style={styles.heading}>{ev.title}</Text>
-                <Text style={styles.line}>
-                  {formatEventDateTimeRange(ev.startsAt, ev.endsAt)}
-                </Text>
-                <Text style={styles.line}>
-                  {ev.isFree ? 'Free' : `Price: ${ev.price ?? '—'} ${ev.currency}`}
-                </Text>
-                {typeof ev.capacity === 'number' ? (
-                  <Text style={styles.line}>Capacity: {ev.capacity}</Text>
-                ) : null}
-                {ev.entertainmentInfo?.trim() ? (
-                  <Text style={styles.description}>{ev.entertainmentInfo}</Text>
-                ) : null}
-                {ev.specialMenuDescription?.trim() ? (
-                  <Text style={styles.description}>
-                    Special menu: {ev.specialMenuDescription}
-                  </Text>
-                ) : null}
-                {ev.specialMenuUrl?.trim() && !ev.specialMenuDescription?.trim() ? (
-                  <Text style={styles.mutedCallout}>
-                    Special menu: {ev.specialMenuUrl.trim()}
-                  </Text>
-                ) : null}
-                {ev.whatIsIncluded?.trim() ? (
-                  <Text style={styles.description}>Included: {ev.whatIsIncluded}</Text>
-                ) : null}
-                {ev.coverImageUrl?.trim() ? (
-                  <Text style={styles.mutedCallout}>
-                    Cover image: {ev.coverImageUrl.trim()}
-                  </Text>
-                ) : null}
-                {gallery.length > 0
-                  ? gallery.map((u) => (
-                      <Text key={u} style={styles.mutedCallout} selectable>
-                        Gallery: {u}
-                      </Text>
-                    ))
-                  : null}
-              </View>
-            );
-          })}
-        </>
-      ) : null}
 
       {hasProfileExtra ? (
         <>

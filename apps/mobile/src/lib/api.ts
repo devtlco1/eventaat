@@ -125,6 +125,63 @@ export async function fetchRestaurantEvents(
   return res.json() as Promise<RestaurantEvent[]>;
 }
 
+/** Single public event (customer sees approved, active, upcoming from API). */
+export async function fetchRestaurantEvent(
+  accessToken: string,
+  restaurantId: string,
+  eventId: string,
+): Promise<RestaurantEvent> {
+  const res = await fetch(
+    `${baseUrl()}/restaurants/${restaurantId}/events/${eventId}`,
+    { headers: authHeaders(accessToken) },
+  );
+  if (res.status === 401) {
+    throw new Error('Unauthorized (401) — sign in again.');
+  }
+  if (!res.ok) {
+    const message = await readErrorMessage(
+      res,
+      res.status === 404 ? 'Event not found.' : `Request failed (${res.status})`,
+    );
+    throw new Error(message);
+  }
+  return res.json() as Promise<RestaurantEvent>;
+}
+
+export type EventFeedItem = { event: RestaurantEvent; hostName: string };
+
+/**
+ * Home: one `GET /restaurants`, then one events list per active restaurant (reuses public routes).
+ * Failed per-venue fetches are skipped so a single error does not empty the list.
+ */
+export async function fetchHomeData(
+  accessToken: string,
+): Promise<{ eventFeed: EventFeedItem[]; restaurants: Restaurant[] }> {
+  const restaurants = await fetchRestaurants(accessToken);
+  const active = restaurants.filter((r) => r.isActive);
+  const nameById = new Map(restaurants.map((r) => [r.id, r.name] as const));
+  const settled = await Promise.allSettled(
+    active.map((r) => fetchRestaurantEvents(accessToken, r.id)),
+  );
+  const byId = new Map<string, RestaurantEvent>();
+  for (const s of settled) {
+    if (s.status !== 'fulfilled') continue;
+    for (const ev of s.value) {
+      byId.set(ev.id, ev);
+    }
+  }
+  const eventFeed = Array.from(byId.values())
+    .sort(
+      (a, b) =>
+        new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
+    )
+    .map((ev) => ({
+      event: ev,
+      hostName: nameById.get(ev.restaurantId) ?? 'Restaurant',
+    }));
+  return { eventFeed, restaurants };
+}
+
 export async function fetchOperatingSettings(
   accessToken: string,
   restaurantId: string,

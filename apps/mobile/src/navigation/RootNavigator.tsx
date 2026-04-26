@@ -3,14 +3,18 @@ import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
+import { EventDetailScreen } from '../screens/EventDetailScreen';
+import { HomeScreen } from '../screens/HomeScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { ReservationsScreen } from '../screens/ReservationsScreen';
 import { RestaurantDetailScreen } from '../screens/RestaurantDetailScreen';
-import { RestaurantsScreen } from '../screens/RestaurantsScreen';
 
 export type RootStackParamList = {
   Login: undefined;
-  Restaurants: undefined;
+  Home: undefined;
+  /** Event night detail — customer flow; not the same as table booking. */
+  EventDetail: { eventId: string; restaurantId: string; eventTitle?: string };
+  /** Normal reservation request; never pass eventId. */
   RestaurantDetail: { restaurantId: string; name: string };
   Reservations: undefined;
 };
@@ -45,10 +49,10 @@ export function RootNavigator() {
       ) : (
         <>
           <Stack.Screen
-            name="Restaurants"
-            component={RestaurantsScreen}
+            name="Home"
+            component={HomeScreen}
             options={({ navigation }) => ({
-              title: 'Restaurants',
+              title: 'Home',
               headerRight: () => (
                 <View style={styles.headerRow}>
                   <Pressable
@@ -63,6 +67,13 @@ export function RootNavigator() {
                   </Pressable>
                 </View>
               ),
+            })}
+          />
+          <Stack.Screen
+            name="EventDetail"
+            component={EventDetailScreen}
+            options={({ route }) => ({
+              title: route.params.eventTitle ?? 'Event',
             })}
           />
           <Stack.Screen

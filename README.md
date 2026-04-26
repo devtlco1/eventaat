@@ -68,7 +68,8 @@ Milestones in place: monorepo foundation; **API** (Nest, health) + **Prisma/Post
 
 ## Current MVP capabilities
 
-- **Customer** can sign in, browse restaurants, and submit a **reservation request** (not fixed table selection)
+- **Customer** (mobile): **Home** is **events-first** (approved, active, upcoming **event nights**), then **restaurants**; **event cards** open **Event detail** (event booking is not enabled yet — “coming soon”); **restaurant cards** open **Restaurant detail** for the **normal table reservation request** flow. Booking is separated by context: **EVENT** (`eventId` + `restaurantId`) vs **RESTAURANT** (`restaurantId` only) in the app types.
+- **Customer** can sign in, browse from **Home**, and submit a **table reservation request** (not fixed table selection)
 - **Customer** can see **My Reservations** with **status and history**
 - **Customer** can **cancel** eligible requests (e.g. pending/held/confirmed, before start time) where rules allow
 - **Platform / restaurant admin** can manage **restaurants**, **assign restaurant admins**, and update **reservation status**
@@ -78,7 +79,7 @@ Milestones in place: monorepo foundation; **API** (Nest, health) + **Prisma/Post
 
 ## Current recommended next work
 
-- Event **booking** flow (separate from table-request reservations) — *event nights are modeled and approved, but not bookable as events yet*
+- **Event reservation / booking** in the mobile app (uses `EVENT` context with `eventId` + `restaurantId`; separate from table requests) — *event detail and types are ready; submission not implemented yet*
 - Offers (later)
 - Discovery / favorites (later)
 - Notifications (later)
