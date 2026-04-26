@@ -92,6 +92,15 @@ export class UsersService {
     });
   }
 
+  /** Update password hash only (used by account password change). */
+  async updatePasswordHash(id: string, passwordHash: string): Promise<SafeUser> {
+    return this.prisma.user.update({
+      where: { id },
+      data: { passwordHash },
+      select: SAFE_USER_SELECT,
+    });
+  }
+
   /** Strip the password hash before sending a user to a client. */
   toPublic(user: User): SafeUser {
     const { passwordHash: _omit, ...safe } = user;

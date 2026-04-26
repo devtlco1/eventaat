@@ -39,12 +39,16 @@ function restName(rl: Restaurant[], id: string) {
 
 function Counter({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
-      <div className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+    <div className="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/60">
+      <div className="text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
         {label}
       </div>
-      <div className="mt-0.5 text-lg font-semibold text-zinc-900">{value}</div>
-      {sub ? <div className="text-[10px] text-zinc-500">{sub}</div> : null}
+      <div className="mt-0.5 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+        {value}
+      </div>
+      {sub ? (
+        <div className="text-[10px] text-zinc-500 dark:text-zinc-400">{sub}</div>
+      ) : null}
     </div>
   );
 }
@@ -305,23 +309,20 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-zinc-900">Dashboard</h1>
-        <p className="mt-1 text-sm text-zinc-600">
-          {isStaff
-            ? 'Snapshot of your venues, events, and pending guest requests.'
-            : 'Welcome.'}
-        </p>
+        <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+          Dashboard
+        </h1>
         {isStaff && (
-          <p className="mt-1 text-sm">
+          <p className="mt-2 text-sm text-zinc-600">
             <Link
               href={pendingBookingsPath()}
-              className="font-medium text-zinc-800 underline"
+              className="font-medium text-zinc-800 underline dark:text-zinc-200"
             >
-              All pending and recent work
+              Pending work
             </Link>
             {' · '}
             <Link
-              className="font-medium text-zinc-800 underline"
+              className="font-medium text-zinc-800 underline dark:text-zinc-200"
               href="/dashboard/notifications"
             >
               Notifications
@@ -331,18 +332,15 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {me && (
-        <p className="text-xs text-zinc-500">
-          Signed in as {me.email} · {me.role}
-        </p>
-      )}
-
       {isStaff && (
         <div>
-          <h2 className="mb-2 text-sm font-semibold text-zinc-800">At a glance</h2>
+          <h2 className="mb-2 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+            At a glance
+          </h2>
           {!ops ? (
-            <p className="text-xs text-amber-800/90">
-              Operations summary could not be loaded; booking counts may show as 0.
+            <p className="text-xs text-amber-800/90 dark:text-amber-200/90">
+              The work queue could not be loaded. Booking counts may be zero until it is
+              available.
             </p>
           ) : null}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">

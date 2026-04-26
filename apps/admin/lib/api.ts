@@ -76,6 +76,28 @@ export function getMe(token: string): Promise<MeResponse> {
   return apiRequest<MeResponse>('/auth/me', { method: 'GET', token });
 }
 
+export function patchMyProfile(
+  token: string,
+  body: { fullName?: string; phone?: string | null },
+): Promise<MeResponse> {
+  return apiRequest<MeResponse>('/me/profile', {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+    token,
+  });
+}
+
+export function patchMyPassword(
+  token: string,
+  body: { currentPassword: string; newPassword: string },
+): Promise<{ ok: true }> {
+  return apiRequest<{ ok: true }>('/me/password', {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+    token,
+  });
+}
+
 export type Restaurant = {
   id: string;
   name: string;

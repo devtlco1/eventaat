@@ -4,7 +4,7 @@
 **OpenAPI JSON:** [http://localhost:4000/docs-json](http://localhost:4000/docs-json) (with API running)  
 **Handwritten reference (detail):** [api-reference.md](api-reference.md)
 
-| Total endpoints | 55 |
+| Total endpoints | 57 |
 |-----------------|----|
 
 ## Count by module (domain)
@@ -14,7 +14,7 @@
 | `health` | 1 | Liveness and DB check |
 | `auth` | 4 | Register, login, session, admin smoke test |
 | `users` | 3 | Platform user directory and updates |
-| `me` | 10 | Reservations (customer) + in-app `notifications` + `reservation-operations` (staff) |
+| `me` | 12 | Account profile + password, reservations (customer) + in-app `notifications` + `reservation-operations` (staff) |
 | `restaurants` | 37 | Restaurants CRUD, ops, events, both reservation types, tables, assignments |
 
 The `restaurants` controller (single Nest `@Controller('restaurants')`) is split below by domain for clarity. Paths still live under `/restaurants/...`.
@@ -57,6 +57,8 @@ All paths are relative to the base URL. Unless noted, JSON request bodies follow
 | PATCH | `/me/notifications/read-all` | me | Bearer | same | implemented | Marks all of caller’s as read; 200: `{ "updated": number }` |
 | PATCH | `/me/notifications/:notificationId/read` | me | Bearer | same | implemented | 404 if not the recipient; 200: notification object |
 | GET | `/me/reservation-operations` | me | Bearer | RESTAURANT_ADMIN, PLATFORM_ADMIN | implemented | 403: `CUSTOMER`; 200: pending + 7d recent table/event rows, scoped by assignment (R-A) or all restaurants (P-A) — admin dashboard work queue |
+| PATCH | `/me/profile` | me | Bearer | any | implemented | 200: update caller `fullName` and/or `phone` (`UpdateMyProfileDto`); 401 |
+| PATCH | `/me/password` | me | Bearer | any | implemented | 200: `{ "ok": true }`; body: `currentPassword`, `newPassword` (min 8); 401 on wrong current password; never returns `passwordHash` |
 | POST | `/restaurants` | restaurants (core) | Bearer | PLATFORM_ADMIN | implemented | Create restaurant |
 | GET | `/restaurants` | restaurants (core) | Bearer | any | implemented | Admins may see inactive |
 | GET | `/restaurants/:id` | restaurants (core) | Bearer | any | implemented | 404: inactive for non-admins (policy) |

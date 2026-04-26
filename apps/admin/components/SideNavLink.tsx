@@ -26,8 +26,8 @@ export function SideNavLink({ href, label, match = 'exact' }: Props) {
       className={[
         'block rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors',
         active
-          ? 'border-l-2 border-amber-600 bg-zinc-200/60 pl-2 text-zinc-900'
-          : 'border-l-2 border-transparent pl-2 text-zinc-600 hover:bg-zinc-100/90 hover:text-zinc-900',
+          ? 'border-l-2 border-amber-600 bg-zinc-200/60 pl-2 text-zinc-900 dark:border-amber-500 dark:bg-zinc-700/50 dark:text-zinc-50'
+          : 'border-l-2 border-transparent pl-2 text-zinc-600 hover:bg-zinc-100/90 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-50',
       ].join(' ')}
     >
       {label}

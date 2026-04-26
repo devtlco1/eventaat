@@ -180,7 +180,27 @@ All routes: **Bearer** + **PLATFORM_ADMIN** only.
 
 ## 4. Me
 
-Paths are grouped by concern. **Reservation** routes in §4.1 are **Bearer** + **`CUSTOMER`** only. **In-app notifications** under `/me/notifications` are **Bearer** + **`CUSTOMER`**, **`RESTAURANT_ADMIN`**, or **`PLATFORM_ADMIN`** — each user only sees their own `Notification` rows in the database. **`GET /me/reservation-operations`** (§4.0.1) is **Bearer** + **`RESTAURANT_ADMIN`** or **`PLATFORM_ADMIN`** and aggregates per-restaurant reservation work for the admin app (not for the mobile **CUSTOMER** role).
+Paths are grouped by concern. **Account** routes (§4.0a) are **Bearer** + **any role** and update only the **authenticated** user. **Reservation** routes in §4.1 are **Bearer** + **`CUSTOMER`** only. **In-app notifications** under `/me/notifications` are **Bearer** + **`CUSTOMER`**, **`RESTAURANT_ADMIN`**, or **`PLATFORM_ADMIN`** — each user only sees their own `Notification` rows in the database. **`GET /me/reservation-operations`** (§4.0.1) is **Bearer** + **`RESTAURANT_ADMIN`** or **`PLATFORM_ADMIN`** and aggregates per-restaurant reservation work for the admin app (not for the mobile **CUSTOMER** role).
+
+### 4.0a Account (profile and password)
+
+| | |
+|---|--|
+| | **`PATCH` `/me/profile`** |
+| **Auth** | **Bearer**; any role (subject is always the token user). |
+| **Body** | Optional: `fullName?` (string, 1–200; trimmed), `phone?` (string, max 32) or `null` to clear. Omitted fields are unchanged. Empty body (after trimming) is a no-op and returns the current `SafeUser`. |
+| **200** | `SafeUser` (never includes `passwordHash`). |
+| **400** if validation fails; **404** if the user row is missing. |
+
+| | |
+|---|--|
+| | **`PATCH` `/me/password`** |
+| **Auth** | **Bearer**; any role. |
+| **Body** | `currentPassword` (required), `newPassword` (required, min 8, max 200, must differ from the current password). |
+| **200** | `{ "ok": true }`. The previous JWT remains valid; clients may re-login to rotate sessions. |
+| **400** for validation or same-password; **401** if `currentPassword` is wrong. |
+
+The admin app uses this from **`/dashboard/account`** (Step 40C) alongside the existing **`GET` `/auth/me`**.
 
 ### 4.0 In-app notifications (stored in DB, no push)
 
