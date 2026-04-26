@@ -4,7 +4,7 @@
 **OpenAPI JSON:** [http://localhost:4000/docs-json](http://localhost:4000/docs-json) (with API running)  
 **Handwritten reference (detail):** [api-reference.md](api-reference.md)
 
-| Total endpoints | 58 |
+| Total endpoints | 59 |
 |-----------------|----|
 
 ## Count by module (domain)
@@ -13,7 +13,7 @@
 |--------|------:|-------------|
 | `health` | 1 | Liveness and DB check |
 | `auth` | 4 | Register, login, session, admin smoke test |
-| `users` | 3 | Platform user directory and updates |
+| `users` | 4 | Platform user create + directory + updates |
 | `me` | 12 | Account profile + password, reservations (customer) + in-app `notifications` + `reservation-operations` (staff) |
 | `restaurants` | 38 | Restaurants CRUD, ops, events, both reservation types, tables, assignments |
 
@@ -45,6 +45,7 @@ All paths are relative to the base URL. Unless noted, JSON request bodies follow
 | GET | `/auth/me` | auth | Bearer | any | implemented | 401: invalid or missing token |
 | GET | `/auth/admin-check` | auth | Bearer | PLATFORM_ADMIN | implemented | 403: non-platform |
 | GET | `/users` | users | Bearer | PLATFORM_ADMIN | implemented | Optional query: `role`, `isActive` |
+| POST | `/users` | users | Bearer | PLATFORM_ADMIN | implemented | 201: create user (email, password, `role`, see `CreateUserDto`) |
 | GET | `/users/:id` | users | Bearer | PLATFORM_ADMIN | implemented | 404: unknown user |
 | PATCH | `/users/:id` | users | Bearer | PLATFORM_ADMIN | implemented | Partial user update |
 | GET | `/me/event-reservations` | me | Bearer | CUSTOMER | implemented | List caller’s event reservations (normalized `type: EVENT`, `statusHistory` oldest→newest) |

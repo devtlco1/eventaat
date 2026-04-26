@@ -34,8 +34,9 @@ export function SideNavLink({
       <Link
         href={href}
         title={label}
+        aria-label={label}
         className={[
-          'flex h-9 w-9 items-center justify-center rounded-md text-zinc-600 transition-colors dark:text-zinc-300',
+          'flex h-8 w-8 items-center justify-center overflow-hidden rounded-md text-zinc-600 transition-colors dark:text-zinc-300',
           active
             ? 'bg-amber-100/90 text-amber-950 dark:bg-amber-900/40 dark:text-amber-100'
             : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800/80',

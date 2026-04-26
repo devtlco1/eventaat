@@ -3,13 +3,24 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AdminFilterBar } from '../../../../components/admin/AdminFilterBar';
+import {
+  adminIconActionClass,
+  AdminIconButton,
+  AdminIconButtonPrimary,
+} from '../../../../components/admin/AdminIconButton';
+import { AdminToolbar } from '../../../../components/admin/AdminToolbar';
 import {
   adminInputClass,
   adminSelectClass,
   adminTableWrap,
   adminThead,
 } from '../../../../components/admin/adminShellClasses';
+import {
+  IconCopy,
+  IconListChevron,
+  IconPlus,
+  IconRefreshCw,
+} from '../../../../components/NavIcons';
 import { AdminEmptyState } from '../../../../components/admin/AdminEmptyState';
 import { AdminErrorState } from '../../../../components/admin/AdminErrorState';
 import { AdminPageHeader } from '../../../../components/admin/AdminPageHeader';
@@ -167,7 +178,7 @@ export default function GlobalTableReservationsPage() {
     const toT = dateTo ? new Date(`${dateTo}T23:59:59.999`) : null;
     return reservations.filter((r) => {
       if (statusFilter !== 'ALL' && r.status !== statusFilter) return false;
-      if (restFilter !== 'ALL' && r.restaurant?.id !== restFilter) return false;
+      if (restFilter !== 'ALL' && r.restaurantId !== restFilter) return false;
       if (!includesCustomer(r, customerQ)) return false;
       const st = new Date(r.startAt);
       if (fromT && !isNaN(fromT.getTime()) && st < fromT) return false;
@@ -351,81 +362,97 @@ export default function GlobalTableReservationsPage() {
         </p>
       ) : null}
 
-      <AdminFilterBar>
-        <label className="text-sm text-zinc-800 dark:text-zinc-200">
-          <span className="mb-0.5 block">Restaurant</span>
-          <select
-            className={adminSelectClass + ' min-w-[10rem] text-zinc-900 dark:text-zinc-100'}
-            value={restFilter}
-            onChange={(e) => setRestFilter(e.target.value)}
-          >
-            <option value="ALL">All</option>
-            {restaurants.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-sm text-zinc-800 dark:text-zinc-200">
-          <span className="mb-0.5 block">Status</span>
-          <select
-            className={adminSelectClass + ' min-w-[8rem] text-zinc-900 dark:text-zinc-100'}
-            value={statusFilter}
-            onChange={(e) =>
-              setStatusFilter(e.target.value as ReservationStatus | 'ALL')
-            }
-          >
-            {STATUS_FILTER.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-sm text-zinc-800 dark:text-zinc-200">
-          <span className="mb-0.5 block">From date</span>
-          <input
-            type="date"
-            className={adminInputClass}
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-          />
-        </label>
-        <label className="text-sm text-zinc-800 dark:text-zinc-200">
-          <span className="mb-0.5 block">To date</span>
-          <input
-            type="date"
-            className={adminInputClass}
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-          />
-        </label>
-        <div className="w-full min-w-[12rem] sm:max-w-xs sm:flex-1">
-          <Input
-            label="Customer (name, email, phone)"
-            value={customerQ}
-            onChange={(e) => setCustomerQ(e.target.value)}
-            placeholder="Filter…"
-          />
-        </div>
-        <div className="w-20">
-          <Input
-            label="Max party"
-            value={partyMax}
-            onChange={(e) => setPartyMax(e.target.value)}
-            placeholder="—"
-          />
-        </div>
-        {canManage ? (
-          <Button type="button" onClick={openAdd}>
-            Add booking
-          </Button>
-        ) : null}
-        <Button type="button" variant="secondary" onClick={refresh}>
-          Refresh
-        </Button>
-      </AdminFilterBar>
+      <AdminToolbar
+        filters={
+          <>
+            <label className="text-sm text-zinc-800 dark:text-zinc-200">
+              <span className="mb-0.5 block">Restaurant</span>
+              <select
+                className={adminSelectClass + ' min-w-[10rem] text-zinc-900 dark:text-zinc-100'}
+                value={restFilter}
+                onChange={(e) => setRestFilter(e.target.value)}
+              >
+                <option value="ALL">All</option>
+                {restaurants.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm text-zinc-800 dark:text-zinc-200">
+              <span className="mb-0.5 block">Status</span>
+              <select
+                className={adminSelectClass + ' min-w-[8rem] text-zinc-900 dark:text-zinc-100'}
+                value={statusFilter}
+                onChange={(e) =>
+                  setStatusFilter(e.target.value as ReservationStatus | 'ALL')
+                }
+              >
+                {STATUS_FILTER.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm text-zinc-800 dark:text-zinc-200">
+              <span className="mb-0.5 block">From date</span>
+              <input
+                type="date"
+                className={adminInputClass}
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+              />
+            </label>
+            <label className="text-sm text-zinc-800 dark:text-zinc-200">
+              <span className="mb-0.5 block">To date</span>
+              <input
+                type="date"
+                className={adminInputClass}
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+              />
+            </label>
+            <div className="w-full min-w-[12rem] sm:max-w-xs sm:flex-1">
+              <Input
+                label="Customer (name, email, phone)"
+                value={customerQ}
+                onChange={(e) => setCustomerQ(e.target.value)}
+                placeholder="Filter…"
+              />
+            </div>
+            <div className="w-20 min-w-[5.5rem]">
+              <Input
+                label="Max party"
+                value={partyMax}
+                onChange={(e) => setPartyMax(e.target.value)}
+                placeholder="—"
+              />
+            </div>
+          </>
+        }
+        actions={
+          <>
+            {canManage ? (
+              <AdminIconButtonPrimary
+                title="Add restaurant booking"
+                aria-label="Add restaurant booking"
+                onClick={openAdd}
+              >
+                <IconPlus />
+              </AdminIconButtonPrimary>
+            ) : null}
+            <AdminIconButton
+              title="Refresh list"
+              aria-label="Refresh list"
+              onClick={() => void refresh()}
+            >
+              <IconRefreshCw />
+            </AdminIconButton>
+          </>
+        }
+      />
 
       <div className={'overflow-hidden ' + adminTableWrap}>
         <div className="overflow-x-auto">
@@ -492,26 +519,36 @@ export default function GlobalTableReservationsPage() {
                           </div>
                         </td>
                         <td className="px-3 py-2 align-top text-zinc-800 dark:text-zinc-200">
-                          {r.restaurant?.name ?? '—'}
-                          <div>
+                          <div className="font-medium">{r.restaurant?.name ?? '—'}</div>
+                          <div className="mt-1 flex flex-wrap gap-0.5">
                             <Link
-                              className="text-xs text-amber-800 underline dark:text-amber-300/90"
                               href={perRestaurantTableReservationsPath(
                                 r.restaurantId,
                               )}
+                              className={adminIconActionClass}
+                              title="Table bookings for this restaurant"
+                              aria-label="Open restaurant table booking list"
                             >
-                              Venue
+                              <IconListChevron />
                             </Link>
-                            <span className="text-zinc-400"> · </span>
-                            <Link
-                              className="text-xs text-zinc-600 underline dark:text-zinc-400"
-                              href={globalTableReservationsPath({
-                                restaurantId: r.restaurantId,
-                                reservationId: r.id,
-                              })}
+                            <AdminIconButton
+                              title="Copy link to this booking"
+                              aria-label="Copy link to this booking"
+                              onClick={async () => {
+                                const path = globalTableReservationsPath({
+                                  restaurantId: r.restaurantId,
+                                  reservationId: r.id,
+                                });
+                                const url = `${window.location.origin}${path}`;
+                                try {
+                                  await navigator.clipboard.writeText(url);
+                                } catch {
+                                  /* ignore */
+                                }
+                              }}
                             >
-                              Copy link
-                            </Link>
+                              <IconCopy />
+                            </AdminIconButton>
                           </div>
                         </td>
                         <td className="px-3 py-2 align-top">
@@ -559,7 +596,7 @@ export default function GlobalTableReservationsPage() {
                                 {s === 'PENDING' ? (
                                   <Button
                                     variant="secondary"
-                                    className="!px-2 !py-0.5 !text-xs"
+                                    className="!h-8 !min-h-8 !px-2 !text-xs"
                                     onClick={() =>
                                       setStatus(r.restaurantId, r.id, 'HELD')
                                     }
@@ -571,7 +608,7 @@ export default function GlobalTableReservationsPage() {
                                   <>
                                     <Button
                                       variant="secondary"
-                                      className="!px-2 !py-0.5 !text-xs"
+                                      className="!h-8 !min-h-8 !px-2 !text-xs"
                                       onClick={() =>
                                         setStatus(
                                           r.restaurantId,
@@ -584,7 +621,7 @@ export default function GlobalTableReservationsPage() {
                                     </Button>
                                     <Button
                                       variant="secondary"
-                                      className="!px-2 !py-0.5 !text-xs"
+                                      className="!h-8 !min-h-8 !px-2 !text-xs"
                                       onClick={() =>
                                         rejectWithPrompt(
                                           r.restaurantId,
@@ -599,7 +636,7 @@ export default function GlobalTableReservationsPage() {
                                 {canCancelThis ? (
                                   <Button
                                     variant="secondary"
-                                    className="!px-2 !py-0.5 !text-xs"
+                                    className="!h-8 !min-h-8 !px-2 !text-xs"
                                     onClick={() =>
                                       setStatus(
                                         r.restaurantId,
@@ -614,7 +651,7 @@ export default function GlobalTableReservationsPage() {
                                 {s === 'CONFIRMED' ? (
                                   <Button
                                     variant="secondary"
-                                    className="!px-2 !py-0.5 !text-xs"
+                                    className="!h-8 !min-h-8 !px-2 !text-xs"
                                     onClick={() =>
                                       setStatus(
                                         r.restaurantId,

@@ -21,7 +21,10 @@ async function bootstrap(): Promise<void> {
   bootLog('after NestFactory.create; configuring HTTP');
 
   app.enableCors({
-    origin: ['http://localhost:3000'],
+    origin: [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+    ],
   });
 
   // Global validation (class-validator + class-transformer). All JSON bodies

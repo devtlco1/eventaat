@@ -154,6 +154,15 @@ A route listing multiple roles (e.g. `PLATFORM_ADMIN`, `RESTAURANT_ADMIN`) means
 
 All routes: **Bearer** + **PLATFORM_ADMIN** only.
 
+### `POST /users`
+
+| | |
+|---|--|
+| **Body** | `email` (email, normalized), `password` (8–72 chars, bcrypt on server), `fullName`, optional `phone`, `role` — any `Role` (see `CreateUserDto`) |
+| **201** | `SafeUser` |
+| **409** | Email already in use |
+| **400** | Validation |
+
 ### `GET /users`
 
 | | |

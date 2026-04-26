@@ -38,3 +38,109 @@ export function IconLogOut(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+/** 16px inside buttons — same stroke as `base` */
+const ac = (props: SVGProps<SVGSVGElement>) =>
+  [base, 'h-4 w-4 shrink-0', props.className].filter(Boolean).join(' ');
+
+export function IconEye(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props} className={ac(props)} aria-hidden>
+      <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+export function IconPencil(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props} className={ac(props)} aria-hidden>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+    </svg>
+  );
+}
+export function IconTrash(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props} className={ac(props)} aria-hidden>
+      <path d="M3 6h18" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+    </svg>
+  );
+}
+export function IconCog(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props} className={ac(props)} aria-hidden>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 1v2" />
+      <path d="M12 21v2" />
+      <path d="M4.22 4.22l1.42 1.42" />
+      <path d="M18.36 18.36l1.42 1.42" />
+      <path d="M1 12h2" />
+      <path d="M21 12h2" />
+      <path d="M4.22 19.78l1.42-1.42" />
+      <path d="M18.36 5.64l1.42-1.42" />
+    </svg>
+  );
+}
+export function IconRefreshCw(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props} className={ac(props)} aria-hidden>
+      <path d="M23 4v6h-6" />
+      <path d="M1 20v-6h6" />
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+    </svg>
+  );
+}
+export function IconPlus(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props} className={ac(props)} aria-hidden>
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
+    </svg>
+  );
+}
+export function IconCopy(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props} className={ac(props)} aria-hidden>
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+export function IconCheck(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props} className={ac(props)} aria-hidden>
+      <path d="M20 6L9 17l-5-5" />
+    </svg>
+  );
+}
+export function IconXMark(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props} className={ac(props)} aria-hidden>
+      <path d="M18 6L6 18" />
+      <path d="M6 6l12 12" />
+    </svg>
+  );
+}
+export function IconUserSlash(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props} className={ac(props)} aria-hidden>
+      <circle cx="9" cy="7" r="3" />
+      <path d="M17 20v-2a4 4 0 0 0-4-4H8" />
+      <path d="M2 2l20 20" />
+    </svg>
+  );
+}
+export function IconListChevron(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props} className={ac(props)} aria-hidden>
+      <path d="M8 6h13" />
+      <path d="M8 12h13" />
+      <path d="M8 18h13" />
+      <path d="M3 6h.01" />
+      <path d="M3 12h.01" />
+      <path d="M3 18h.01" />
+    </svg>
+  );
+}

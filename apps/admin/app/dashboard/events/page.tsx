@@ -3,13 +3,19 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AdminFilterBar } from '../../../components/admin/AdminFilterBar';
+import {
+  adminIconActionClass,
+  AdminIconButton,
+  AdminIconButtonPrimary,
+} from '../../../components/admin/AdminIconButton';
+import { AdminToolbar } from '../../../components/admin/AdminToolbar';
 import {
   adminInputClass,
   adminSelectClass,
   adminThead,
   adminTableWrap,
 } from '../../../components/admin/adminShellClasses';
+import { IconCheck, IconEye, IconPlus, IconRefreshCw, IconXMark } from '../../../components/NavIcons';
 import { AdminEmptyState } from '../../../components/admin/AdminEmptyState';
 import { AdminErrorState } from '../../../components/admin/AdminErrorState';
 import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
@@ -327,87 +333,103 @@ export default function EventNightsPage() {
         </p>
       ) : null}
 
-      <AdminFilterBar>
-        <label className="text-sm text-zinc-800 dark:text-zinc-200">
-          <span className="mb-0.5 block">Restaurant</span>
-          <select
-            className={adminSelectClass + ' min-w-[10rem] text-zinc-900 dark:text-zinc-100'}
-            value={restFilter}
-            onChange={(e) => setRestFilter(e.target.value)}
-          >
-            <option value="ALL">All</option>
-            {restaurants.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-sm text-zinc-800 dark:text-zinc-200">
-          <span className="mb-0.5 block">Event status</span>
-          <select
-            className={adminSelectClass + ' min-w-[7rem] text-zinc-900 dark:text-zinc-100'}
-            value={statusFilter}
-            onChange={(e) =>
-              setStatusFilter(e.target.value as typeof statusFilter)
-            }
-          >
-            {STATUS_OPTIONS.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-sm text-zinc-800 dark:text-zinc-200">
-          <span className="mb-0.5 block">Active</span>
-          <select
-            className={adminSelectClass + ' min-w-[5rem] text-zinc-900 dark:text-zinc-100'}
-            value={activeFilter}
-            onChange={(e) =>
-              setActiveFilter(e.target.value as typeof activeFilter)
-            }
-          >
-            <option value="all">All</option>
-            <option value="true">On</option>
-            <option value="false">Off</option>
-          </select>
-        </label>
-        <label className="text-sm text-zinc-800 dark:text-zinc-200">
-          <span className="mb-0.5 block">Starts from</span>
-          <input
-            type="date"
-            className={adminInputClass}
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-          />
-        </label>
-        <label className="text-sm text-zinc-800 dark:text-zinc-200">
-          <span className="mb-0.5 block">Starts to</span>
-          <input
-            type="date"
-            className={adminInputClass}
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-          />
-        </label>
-        <div className="min-w-[10rem] max-w-sm flex-1">
-          <Input
-            label="Search title"
-            value={titleQ}
-            onChange={(e) => setTitleQ(e.target.value)}
-            placeholder="…"
-          />
-        </div>
-        {canList ? (
-          <Button type="button" onClick={openCreate}>
-            Add event night
-          </Button>
-        ) : null}
-        <Button type="button" variant="secondary" onClick={load}>
-          Refresh
-        </Button>
-      </AdminFilterBar>
+      <AdminToolbar
+        filters={
+          <>
+            <label className="text-sm text-zinc-800 dark:text-zinc-200">
+              <span className="mb-0.5 block">Restaurant</span>
+              <select
+                className={adminSelectClass + ' min-w-[10rem] text-zinc-900 dark:text-zinc-100'}
+                value={restFilter}
+                onChange={(e) => setRestFilter(e.target.value)}
+              >
+                <option value="ALL">All</option>
+                {restaurants.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm text-zinc-800 dark:text-zinc-200">
+              <span className="mb-0.5 block">Event status</span>
+              <select
+                className={adminSelectClass + ' min-w-[7rem] text-zinc-900 dark:text-zinc-100'}
+                value={statusFilter}
+                onChange={(e) =>
+                  setStatusFilter(e.target.value as typeof statusFilter)
+                }
+              >
+                {STATUS_OPTIONS.map((o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm text-zinc-800 dark:text-zinc-200">
+              <span className="mb-0.5 block">Active</span>
+              <select
+                className={adminSelectClass + ' min-w-[5rem] text-zinc-900 dark:text-zinc-100'}
+                value={activeFilter}
+                onChange={(e) =>
+                  setActiveFilter(e.target.value as typeof activeFilter)
+                }
+              >
+                <option value="all">All</option>
+                <option value="true">On</option>
+                <option value="false">Off</option>
+              </select>
+            </label>
+            <label className="text-sm text-zinc-800 dark:text-zinc-200">
+              <span className="mb-0.5 block">Starts from</span>
+              <input
+                type="date"
+                className={adminInputClass}
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+              />
+            </label>
+            <label className="text-sm text-zinc-800 dark:text-zinc-200">
+              <span className="mb-0.5 block">Starts to</span>
+              <input
+                type="date"
+                className={adminInputClass}
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+              />
+            </label>
+            <div className="min-w-[10rem] max-w-sm flex-1">
+              <Input
+                label="Search title"
+                value={titleQ}
+                onChange={(e) => setTitleQ(e.target.value)}
+                placeholder="…"
+              />
+            </div>
+          </>
+        }
+        actions={
+          <>
+            {canList ? (
+              <AdminIconButtonPrimary
+                title="Add event night"
+                aria-label="Add event night"
+                onClick={openCreate}
+              >
+                <IconPlus />
+              </AdminIconButtonPrimary>
+            ) : null}
+            <AdminIconButton
+              title="Refresh list"
+              aria-label="Refresh list"
+              onClick={() => void load()}
+            >
+              <IconRefreshCw />
+            </AdminIconButton>
+          </>
+        }
+      />
 
       {highlightEventId ? (
         <p className="text-xs text-amber-900/90 dark:text-amber-200/80">
@@ -510,33 +532,35 @@ export default function EventNightsPage() {
                         ) : null}
                       </td>
                       <td className="px-3 py-2">
-                        <div className="flex flex-wrap items-center gap-1">
+                        <div className="flex flex-wrap items-center gap-0.5">
                           <Link
                             href={`/dashboard/restaurants/${ev.restaurantId}/events`}
-                            className="text-xs text-zinc-800 underline dark:text-amber-200/90"
+                            className={adminIconActionClass}
+                            title="View event nights for this restaurant"
+                            aria-label="View event nights for this restaurant"
                           >
-                            View
+                            <IconEye />
                           </Link>
                           {isPlatform && ev.status === 'PENDING' ? (
                             <>
-                              <Button
-                                variant="secondary"
-                                className="!px-2 !py-0.5 !text-xs"
+                              <AdminIconButton
                                 type="button"
+                                title="Approve"
+                                aria-label="Approve event night"
                                 disabled={busy}
                                 onClick={() => doReview(ev, 'APPROVED')}
                               >
-                                Approve
-                              </Button>
-                              <Button
-                                variant="secondary"
-                                className="!px-2 !py-0.5 !text-xs"
+                                <IconCheck />
+                              </AdminIconButton>
+                              <AdminIconButton
                                 type="button"
+                                title="Reject"
+                                aria-label="Reject event night"
                                 disabled={busy}
                                 onClick={() => doReview(ev, 'REJECTED')}
                               >
-                                Reject
-                              </Button>
+                                <IconXMark />
+                              </AdminIconButton>
                             </>
                           ) : null}
                         </div>

@@ -1,9 +1,9 @@
+import { getApiBaseUrl } from './apiBaseUrl';
+
 export type ApiError = {
   status: number;
   message: string;
 };
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 async function parseError(res: Response): Promise<ApiError> {
   try {
@@ -41,7 +41,8 @@ export async function apiRequest<T>(
   path: string,
   options: RequestInit & { token?: string } = {},
 ): Promise<T> {
-  const url = `${API_URL}${path.startsWith('/') ? '' : '/'}${path}`;
+  const base = getApiBaseUrl();
+  const url = `${base}${path.startsWith('/') ? '' : '/'}${path}`;
 
   const headers = new Headers(options.headers);
   if (!headers.has('Content-Type') && options.body) {
@@ -540,6 +541,23 @@ export function updateUser(
 ): Promise<PlatformUser> {
   return apiRequest<PlatformUser>(`/users/${id}`, {
     method: 'PATCH',
+    token,
+    body: JSON.stringify(input),
+  });
+}
+
+export function createUser(
+  token: string,
+  input: {
+    email: string;
+    password: string;
+    fullName: string;
+    phone?: string;
+    role: UserRole;
+  },
+): Promise<PlatformUser> {
+  return apiRequest<PlatformUser>('/users', {
+    method: 'POST',
     token,
     body: JSON.stringify(input),
   });

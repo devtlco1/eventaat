@@ -1,6 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Role, User } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
+
+const BCRYPT_ROUNDS = 12;
 
 /** A User stripped of secrets — safe to return from the API. */
 export type SafeUser = Omit<User, 'passwordHash'>;
@@ -90,6 +93,31 @@ export class UsersService {
         role: input.role ?? Role.CUSTOMER,
       },
     });
+  }
+
+  /**
+   * Create a user with a plain password (admin flow). Fails on duplicate email.
+   */
+  async createWithPassword(dto: {
+    email: string;
+    password: string;
+    fullName: string;
+    phone?: string;
+    role: Role;
+  }): Promise<SafeUser> {
+    const existing = await this.findByEmail(dto.email);
+    if (existing) {
+      throw new ConflictException('Email is already in use');
+    }
+    const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+    const user = await this.create({
+      email: dto.email,
+      passwordHash,
+      fullName: dto.fullName.trim(),
+      phone: dto.phone?.trim() || undefined,
+      role: dto.role,
+    });
+    return this.toPublic(user);
   }
 
   /** Update password hash only (used by account password change). */

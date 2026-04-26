@@ -2,8 +2,10 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AdminFilterBar } from '../../../components/admin/AdminFilterBar';
+import { AdminIconButton } from '../../../components/admin/AdminIconButton';
+import { AdminToolbar } from '../../../components/admin/AdminToolbar';
 import { adminSelectClass } from '../../../components/admin/adminShellClasses';
+import { IconRefreshCw } from '../../../components/NavIcons';
 import { AdminEmptyState } from '../../../components/admin/AdminEmptyState';
 import { AdminErrorState } from '../../../components/admin/AdminErrorState';
 import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
@@ -163,51 +165,65 @@ export default function AdminNotificationsPage() {
           {navErr}
         </div>
       ) : null}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          {unreadCount} unread
-          {loading ? ' — loading' : null}
-        </p>
-        {unreadCount > 0 && !err ? (
-          <Button
-            variant="secondary"
-            type="button"
-            onClick={() => void onReadAll()}
-          >
-            Mark all as read
-          </Button>
-        ) : null}
-      </div>
-      <AdminFilterBar>
-        <label className="text-sm text-zinc-800 dark:text-zinc-200">
-          <span className="mb-0.5 block">Inbox</span>
-          <select
-            className={adminSelectClass}
-            value={readMode}
-            onChange={(e) => setReadMode(e.target.value as 'all' | 'unread')}
-          >
-            <option value="all">All</option>
-            <option value="unread">Unread only</option>
-          </select>
-        </label>
-        <label className="text-sm text-zinc-800 dark:text-zinc-200">
-          <span className="mb-0.5 block">Type</span>
-          <select
-            className={adminSelectClass}
-            value={typeFilter}
-            onChange={(e) => {
-              setTypeFilter(e.target.value);
-              setPage(1);
-            }}
-          >
-            {typeOptions.map((t) => (
-              <option key={t} value={t}>
-                {t === 'all' ? 'All types' : t}
-              </option>
-            ))}
-          </select>
-        </label>
-      </AdminFilterBar>
+      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        {unreadCount} unread
+        {loading ? ' — loading' : null}
+      </p>
+      <AdminToolbar
+        filters={
+          <>
+            <label className="text-sm text-zinc-800 dark:text-zinc-200">
+              <span className="mb-0.5 block">Inbox</span>
+              <select
+                className={adminSelectClass}
+                value={readMode}
+                onChange={(e) => setReadMode(e.target.value as 'all' | 'unread')}
+              >
+                <option value="all">All</option>
+                <option value="unread">Unread only</option>
+              </select>
+            </label>
+            <label className="text-sm text-zinc-800 dark:text-zinc-200">
+              <span className="mb-0.5 block">Type</span>
+              <select
+                className={adminSelectClass}
+                value={typeFilter}
+                onChange={(e) => {
+                  setTypeFilter(e.target.value);
+                  setPage(1);
+                }}
+              >
+                {typeOptions.map((t) => (
+                  <option key={t} value={t}>
+                    {t === 'all' ? 'All types' : t}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </>
+        }
+        actions={
+          <>
+            {unreadCount > 0 && !err ? (
+              <Button
+                variant="secondary"
+                type="button"
+                className="!h-8 !px-2.5 !text-xs"
+                onClick={() => void onReadAll()}
+              >
+                Mark all read
+              </Button>
+            ) : null}
+            <AdminIconButton
+              title="Refresh"
+              aria-label="Refresh notifications"
+              onClick={() => void load()}
+            >
+              <IconRefreshCw />
+            </AdminIconButton>
+          </>
+        }
+      />
       {loading && rows.length === 0 && !err ? (
         <p className="text-sm text-zinc-600 dark:text-zinc-400">Loading…</p>
       ) : null}

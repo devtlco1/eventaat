@@ -4,12 +4,24 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge } from '../../../components/Badge';
-import { AdminFilterBar } from '../../../components/admin/AdminFilterBar';
+import { AdminPageHeader } from '../../../components/admin/AdminPageHeader';
+import {
+  AdminIconButton,
+  AdminIconButtonPrimary,
+} from '../../../components/admin/AdminIconButton';
+import { AdminToolbar } from '../../../components/admin/AdminToolbar';
+import { adminIconActionClass } from '../../../components/admin/AdminIconButton';
 import {
   adminSelectClass,
   adminThead,
   adminTableWrap,
 } from '../../../components/admin/adminShellClasses';
+import {
+  IconCog,
+  IconEye,
+  IconPlus,
+  IconRefreshCw,
+} from '../../../components/NavIcons';
 import { AdminPaginationBar } from '../../../components/AdminPaginationBar';
 import { AdminEmptyState } from '../../../components/admin/AdminEmptyState';
 import { Button } from '../../../components/Button';
@@ -99,11 +111,9 @@ export default function RestaurantsPage() {
       try {
         await refresh();
       } catch (err) {
-        const message =
-          typeof err === 'object' && err && 'message' in err
-            ? String((err as { message: string }).message)
-            : 'Failed to load restaurants';
-        if (!cancelled) setError(message);
+        if (!cancelled) {
+          setError(getRequestErrorMessage(err, 'Failed to load restaurants'));
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -185,15 +195,10 @@ export default function RestaurantsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
-          Restaurants
-        </h1>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          Create and manage venue records. Bookings and event nights use separate
-          pages.
-        </p>
-      </div>
+      <AdminPageHeader
+        title="Restaurants"
+        description="Venue records. Table bookings and event nights are managed on their own pages."
+      />
 
       {success ? (
         <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800 dark:border-green-800/50 dark:bg-green-950/40 dark:text-green-200/90">
@@ -206,56 +211,72 @@ export default function RestaurantsPage() {
         </div>
       ) : null}
 
-      <AdminFilterBar>
-        <div className="min-w-[10rem] flex-1 sm:max-w-xs">
-          <Input
-            label="Search name"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="…"
-          />
-        </div>
-        <div className="w-32">
-          <Input
-            label="City"
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            placeholder="…"
-          />
-        </div>
-        <label className="text-sm text-zinc-800 dark:text-zinc-200">
-          <span className="mb-0.5 block">Active</span>
-          <select
-            className={adminSelectClass + ' min-w-[7rem] text-zinc-900 dark:text-zinc-100'}
-            value={active}
-            onChange={(e) => setActive(e.target.value as typeof active)}
-          >
-            <option value="all">All</option>
-            <option value="true">Active</option>
-            <option value="false">Inactive</option>
-          </select>
-        </label>
-        <label className="text-sm text-zinc-800 dark:text-zinc-200">
-          <span className="mb-0.5 block">Accepts reservations</span>
-          <select
-            className={adminSelectClass + ' min-w-[7rem] text-zinc-900 dark:text-zinc-100'}
-            value={accFilter}
-            onChange={(e) => setAccFilter(e.target.value as typeof accFilter)}
-          >
-            <option value="all">All</option>
-            <option value="true">Yes</option>
-            <option value="false">No</option>
-          </select>
-        </label>
-        {canCreate ? (
-          <Button type="button" onClick={() => setCreateOpen(true)}>
-            Add restaurant
-          </Button>
-        ) : null}
-        <Button type="button" variant="secondary" onClick={() => void refresh()}>
-          Refresh
-        </Button>
-      </AdminFilterBar>
+      <AdminToolbar
+        filters={
+          <>
+            <div className="min-w-[10rem] flex-1 sm:max-w-xs">
+              <Input
+                label="Search name"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="…"
+              />
+            </div>
+            <div className="w-32 min-w-[7rem]">
+              <Input
+                label="City"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="…"
+              />
+            </div>
+            <label className="text-sm text-zinc-800 dark:text-zinc-200">
+              <span className="mb-0.5 block">Active</span>
+              <select
+                className={adminSelectClass + ' min-w-[7rem] text-zinc-900 dark:text-zinc-100'}
+                value={active}
+                onChange={(e) => setActive(e.target.value as typeof active)}
+              >
+                <option value="all">All</option>
+                <option value="true">Active</option>
+                <option value="false">Inactive</option>
+              </select>
+            </label>
+            <label className="text-sm text-zinc-800 dark:text-zinc-200">
+              <span className="mb-0.5 block">Accepts reservations</span>
+              <select
+                className={adminSelectClass + ' min-w-[7rem] text-zinc-900 dark:text-zinc-100'}
+                value={accFilter}
+                onChange={(e) => setAccFilter(e.target.value as typeof accFilter)}
+              >
+                <option value="all">All</option>
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+              </select>
+            </label>
+          </>
+        }
+        actions={
+          <>
+            {canCreate ? (
+              <AdminIconButtonPrimary
+                title="Add restaurant"
+                aria-label="Add restaurant"
+                onClick={() => setCreateOpen(true)}
+              >
+                <IconPlus />
+              </AdminIconButtonPrimary>
+            ) : null}
+            <AdminIconButton
+              title="Refresh list"
+              aria-label="Refresh list"
+              onClick={() => void refresh()}
+            >
+              <IconRefreshCw />
+            </AdminIconButton>
+          </>
+        }
+      />
 
       {me && !canCreate ? (
         <div className="rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-700 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/70">
@@ -318,19 +339,23 @@ export default function RestaurantsPage() {
                         {r.isActive ? 'Active' : 'Inactive'}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
+                    <td className="px-4 py-2 text-right">
+                      <div className="flex justify-end gap-0.5">
                         <Link
-                          className="font-medium text-amber-800 underline dark:text-amber-300/90"
                           href={`/dashboard/restaurants/${r.id}/profile`}
+                          className={adminIconActionClass}
+                          title="Open profile (read-only)"
+                          aria-label="Open restaurant profile"
                         >
-                          View
+                          <IconEye />
                         </Link>
                         <Link
-                          className="font-medium text-zinc-800 underline dark:text-zinc-300"
                           href={`/dashboard/restaurants/${r.id}/settings`}
+                          className={adminIconActionClass}
+                          title="Open settings (edit details)"
+                          aria-label="Open restaurant settings"
                         >
-                          Settings
+                          <IconCog />
                         </Link>
                       </div>
                     </td>

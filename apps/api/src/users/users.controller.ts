@@ -5,14 +5,16 @@ import {
   Param,
   ParseUUIDPipe,
   Patch,
+  Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { CreateUserDto } from './dto/create-user.dto';
 import { ListUsersQueryDto } from './dto/list-users-query.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { SafeUser, UsersService } from './users.service';
@@ -24,6 +26,12 @@ import { SafeUser, UsersService } from './users.service';
 @Roles(Role.PLATFORM_ADMIN)
 export class UsersController {
   constructor(private readonly users: UsersService) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Create a user account (platform admin)' })
+  create(@Body() dto: CreateUserDto): Promise<SafeUser> {
+    return this.users.createWithPassword(dto);
+  }
 
   @Get()
   list(@Query() query: ListUsersQueryDto): Promise<SafeUser[]> {

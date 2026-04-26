@@ -39,7 +39,7 @@ export function Modal({ title, open, onClose, children, footer }: Props) {
         role="dialog"
         aria-modal
         aria-labelledby={id}
-        className="relative z-10 max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-lg border border-zinc-200 bg-white shadow-xl dark:border-zinc-700 dark:bg-zinc-900"
+        className="relative z-10 max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-lg border border-zinc-200 bg-white text-zinc-900 shadow-xl dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
       >
         <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-700">
           <h2 id={id} className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
