@@ -71,14 +71,16 @@ export default function UsersPage() {
     const token = getToken();
     if (!token) return;
 
-    const [meRes, usersRes] = await Promise.all([
-      getMe(token),
-      listUsers(token, {
-        role: roleFilter || undefined,
-        isActive: activeFilter === 'all' ? undefined : toBoolFilter(activeFilter),
-      }),
-    ]);
+    const meRes = await getMe(token);
     setMe(meRes);
+    if (meRes.role !== 'PLATFORM_ADMIN') {
+      setUsers([]);
+      return;
+    }
+    const usersRes = await listUsers(token, {
+      role: roleFilter || undefined,
+      isActive: activeFilter === 'all' ? undefined : toBoolFilter(activeFilter),
+    });
     setUsers(usersRes);
   }
 
@@ -188,6 +190,7 @@ export default function UsersPage() {
         </div>
       ) : null}
 
+      {isPlatformAdmin ? (
       <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -260,6 +263,7 @@ export default function UsersPage() {
           </div>
         </div>
       </div>
+      ) : null}
 
       {editingUser && editForm ? (
         <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
@@ -342,6 +346,7 @@ export default function UsersPage() {
         </div>
       ) : null}
 
+      {isPlatformAdmin ? (
       <div className="rounded-xl border border-zinc-200 bg-white shadow-sm">
         <div className="flex items-center justify-between gap-4 border-b border-zinc-200 px-6 py-4">
           <div className="text-sm font-semibold text-zinc-900">User list</div>
@@ -412,6 +417,7 @@ export default function UsersPage() {
           </table>
         </div>
       </div>
+      ) : null}
     </div>
   );
 }

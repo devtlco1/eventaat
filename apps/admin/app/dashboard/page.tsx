@@ -229,23 +229,40 @@ export default function DashboardPage() {
               Quick actions
             </h2>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {canViewOperations ? (
+                <>
+                  <QuickActionCard
+                    href="/dashboard/operations"
+                    title="Operations"
+                    description="Cross-venue work queue, pending and recent, with in-row actions when applicable."
+                  />
+                  <QuickActionCard
+                    href="/dashboard/reservations/tables"
+                    title="Table reservations"
+                    description="All table requests in your scope, filters, and per-row actions."
+                  />
+                  <QuickActionCard
+                    href="/dashboard/reservations/events"
+                    title="Event reservations"
+                    description="Event night requests across your restaurants, confirm and reject with capacity on confirm."
+                  />
+                </>
+              ) : null}
+              <QuickActionCard
+                href="/dashboard/notifications"
+                title="Notifications"
+                description="In-app messages with links to the related reservation when applicable."
+              />
               <QuickActionCard
                 href="/dashboard/restaurants"
-                title="Manage restaurants"
-                description="List restaurants, tables, reservations, and admins per venue."
+                title="Restaurants"
+                description="List venues, tables, per-restaurant detail, and admin assignments."
               />
               {isPlatformAdmin ? (
                 <QuickActionCard
                   href="/dashboard/users"
-                  title="Manage users"
+                  title="Users"
                   description="View and edit users, roles, and active status."
-                />
-              ) : null}
-              {canViewOperations ? (
-                <QuickActionCard
-                  href="/dashboard/operations"
-                  title="Reservation operations"
-                  description="Pending table and event requests, and recent status changes, with links to the right list."
                 />
               ) : null}
             </div>

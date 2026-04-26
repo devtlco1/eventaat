@@ -2,17 +2,20 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button } from '../../../components/Button';
 import {
   getReservationOperations,
   type ReservationOperationsEventItem,
   type ReservationOperationsResponse,
   type ReservationOperationsTableItem,
+  updateEventReservationStatus,
+  updateReservationStatus,
 } from '../../../lib/api';
 import { getToken } from '../../../lib/auth';
 import {
-  adminEventReservationListPath,
-  adminTableReservationListPath,
-} from '../../../lib/notificationLinks';
+  globalEventReservationsPath,
+  globalTableReservationsPath,
+} from '../../../lib/reservationLinks';
 
 type TypeFilter = 'ALL' | 'TABLE' | 'EVENT';
 type StatusFilter = 'ALL' | 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'CANCELLED';
@@ -41,66 +44,19 @@ function when(iso: string): string {
   }
 }
 
-function RowBlock({
-  row,
-  showEventTitle,
-  showRequestSlot,
-}: {
-  row: OpRow;
-  showEventTitle: boolean;
-  showRequestSlot: boolean;
-}) {
-  const href =
-    row.type === 'TABLE'
-      ? adminTableReservationListPath(row.restaurant.id, row.id)
-      : adminEventReservationListPath(
-          row.restaurant.id,
-          row.id,
-          row.eventId,
-        );
-  return (
-    <li className="list-none">
-      <Link
-        href={href}
-        className="block rounded-md border border-zinc-200 bg-white px-3 py-2 text-left text-sm hover:bg-zinc-50"
-      >
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <span className="font-medium text-zinc-900">
-            {row.type === 'TABLE' ? 'TABLE' : 'EVENT'}
-            {showEventTitle && row.type === 'EVENT' ? (
-              <span className="ml-1 font-normal text-zinc-600">
-                — {row.eventTitle}
-              </span>
-            ) : null}
-          </span>
-          <span className="text-xs text-zinc-500">{itemStatus(row)}</span>
-        </div>
-        <div className="mt-1 text-zinc-700">
-          {row.customer.fullName} · {row.customer.email}
-          {row.customer.phone ? ` · ${row.customer.phone}` : ''}
-        </div>
-        <div className="mt-1 text-xs text-zinc-500">
-          {row.restaurant.name} · party {row.partySize} · requested{' '}
-          {when(row.requestedAt)}
-        </div>
-        {row.type === 'TABLE' && showRequestSlot ? (
-          <div className="mt-0.5 text-xs text-zinc-500">
-            Table window: {when(row.startAt)} – {when(row.endAt)}
-          </div>
-        ) : null}
-        {row.type === 'EVENT' && showRequestSlot ? (
-          <div className="mt-0.5 text-xs text-zinc-500">
-            Event: {when(row.eventStartsAt)} – {when(row.eventEndsAt)}
-          </div>
-        ) : null}
-        {row.note ? (
-          <div className="mt-1 text-xs text-zinc-600">Note: {row.note}</div>
-        ) : null}
-        <div className="mt-1 text-xs font-medium text-zinc-800">Open in restaurant →</div>
-      </Link>
-    </li>
-  );
-}
+const TYPE_OPTIONS: { value: TypeFilter; label: string }[] = [
+  { value: 'ALL', label: 'All types' },
+  { value: 'TABLE', label: 'Table' },
+  { value: 'EVENT', label: 'Event' },
+];
+
+const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
+  { value: 'ALL', label: 'All statuses' },
+  { value: 'PENDING', label: 'Pending' },
+  { value: 'CONFIRMED', label: 'Confirmed' },
+  { value: 'REJECTED', label: 'Rejected' },
+  { value: 'CANCELLED', label: 'Cancelled' },
+];
 
 function StatLine({
   label,
@@ -122,19 +78,254 @@ function StatLine({
   );
 }
 
-const TYPE_OPTIONS: { value: TypeFilter; label: string }[] = [
-  { value: 'ALL', label: 'All types' },
-  { value: 'TABLE', label: 'Table' },
-  { value: 'EVENT', label: 'Event' },
-];
+type RowBlockProps = {
+  row: OpRow;
+  showEventTitle: boolean;
+  showRequestSlot: boolean;
+  showActions: boolean;
+  onAfterAction: () => void;
+};
 
-const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
-  { value: 'ALL', label: 'All statuses' },
-  { value: 'PENDING', label: 'Pending' },
-  { value: 'CONFIRMED', label: 'Confirmed' },
-  { value: 'REJECTED', label: 'Rejected' },
-  { value: 'CANCELLED', label: 'Cancelled' },
-];
+function RowBlock({
+  row,
+  showEventTitle,
+  showRequestSlot,
+  showActions,
+  onAfterAction,
+}: RowBlockProps) {
+  const href =
+    row.type === 'TABLE'
+      ? globalTableReservationsPath({
+          restaurantId: row.restaurant.id,
+          reservationId: row.id,
+        })
+      : globalEventReservationsPath({
+          restaurantId: row.restaurant.id,
+          eventReservationId: row.id,
+          eventId: row.type === 'EVENT' ? row.eventId : undefined,
+        });
+
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function onConfirmTable() {
+    if (row.type !== 'TABLE') return;
+    if (!window.confirm('Confirm this table reservation?')) return;
+    const token = getToken();
+    if (!token) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await updateReservationStatus(
+        token,
+        row.restaurant.id,
+        row.id,
+        'CONFIRMED',
+      );
+      onAfterAction();
+    } catch (e) {
+      setErr(
+        typeof e === 'object' && e && 'message' in e
+          ? String((e as { message: string }).message)
+          : 'Confirm failed',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onRejectTable() {
+    if (row.type !== 'TABLE') return;
+    const note = window.prompt('Rejection reason (optional)');
+    if (note === null) return;
+    const token = getToken();
+    if (!token) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await updateReservationStatus(
+        token,
+        row.restaurant.id,
+        row.id,
+        'REJECTED',
+        note || undefined,
+      );
+      onAfterAction();
+    } catch (e) {
+      setErr(
+        typeof e === 'object' && e && 'message' in e
+          ? String((e as { message: string }).message)
+          : 'Reject failed',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onConfirmEvent() {
+    if (row.type !== 'EVENT') return;
+    if (!window.confirm('Confirm this event reservation?')) return;
+    const token = getToken();
+    if (!token) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await updateEventReservationStatus(
+        token,
+        row.restaurant.id,
+        row.id,
+        { status: 'CONFIRMED' },
+      );
+      onAfterAction();
+    } catch (e) {
+      const code =
+        typeof e === 'object' && e && 'status' in e
+          ? Number((e as { status: number }).status)
+          : undefined;
+      if (code === 422) {
+        setErr(
+          typeof e === 'object' && e && 'message' in e
+            ? String((e as { message: string }).message)
+            : 'Not enough capacity or business rule',
+        );
+      } else {
+        setErr(
+          typeof e === 'object' && e && 'message' in e
+            ? String((e as { message: string }).message)
+            : 'Confirm failed',
+        );
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onRejectEvent() {
+    if (row.type !== 'EVENT') return;
+    const reason = window.prompt('Rejection reason (optional)');
+    if (reason === null) return;
+    const token = getToken();
+    if (!token) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await updateEventReservationStatus(
+        token,
+        row.restaurant.id,
+        row.id,
+        { status: 'REJECTED', rejectionReason: reason || undefined },
+      );
+      onAfterAction();
+    } catch (e) {
+      setErr(
+        typeof e === 'object' && e && 'message' in e
+          ? String((e as { message: string }).message)
+          : 'Reject failed',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const pending = row.status === 'PENDING';
+
+  return (
+    <li className="list-none">
+      <div className="flex flex-col gap-2 rounded-md border border-zinc-200 bg-white p-3 text-sm sm:flex-row sm:items-stretch sm:justify-between sm:gap-3">
+        <div className="min-w-0 flex-1">
+          <Link
+            href={href}
+            className="block text-left text-zinc-800 hover:underline"
+          >
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <span className="font-medium text-zinc-900">
+                {row.type === 'TABLE' ? 'TABLE' : 'EVENT'}
+                {showEventTitle && row.type === 'EVENT' ? (
+                  <span className="ml-1 font-normal text-zinc-600">
+                    — {row.eventTitle}
+                  </span>
+                ) : null}
+              </span>
+              <span className="text-xs text-zinc-500">{itemStatus(row)}</span>
+            </div>
+            <div className="mt-1 text-zinc-700">
+              {row.customer.fullName} · {row.customer.email}
+              {row.customer.phone ? ` · ${row.customer.phone}` : ''}
+            </div>
+            <div className="mt-1 text-xs text-zinc-500">
+              {row.restaurant.name} · party {row.partySize} · requested{' '}
+              {when(row.requestedAt)}
+            </div>
+            {row.type === 'TABLE' && showRequestSlot ? (
+              <div className="mt-0.5 text-xs text-zinc-500">
+                Table window: {when(row.startAt)} – {when(row.endAt)}
+              </div>
+            ) : null}
+            {row.type === 'EVENT' && showRequestSlot ? (
+              <div className="mt-0.5 text-xs text-zinc-500">
+                Event: {when(row.eventStartsAt)} – {when(row.eventEndsAt)}
+              </div>
+            ) : null}
+            {row.note ? (
+              <div className="mt-1 text-xs text-zinc-600">Note: {row.note}</div>
+            ) : null}
+            <div className="mt-1 text-xs text-zinc-500">Open full list →</div>
+          </Link>
+          {err ? (
+            <div className="mt-2 text-xs text-red-700">{err}</div>
+          ) : null}
+        </div>
+        {showActions && pending ? (
+          <div className="flex shrink-0 flex-col justify-center gap-2 sm:w-36">
+            {row.type === 'TABLE' ? (
+              <>
+                <Button
+                  variant="secondary"
+                  className="!px-2 !py-1.5 !text-xs"
+                  type="button"
+                  disabled={busy}
+                  onClick={onConfirmTable}
+                >
+                  Confirm
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="!px-2 !py-1.5 !text-xs"
+                  type="button"
+                  disabled={busy}
+                  onClick={onRejectTable}
+                >
+                  Reject
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="secondary"
+                  className="!px-2 !py-1.5 !text-xs"
+                  type="button"
+                  disabled={busy}
+                  onClick={onConfirmEvent}
+                >
+                  Confirm
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="!px-2 !py-1.5 !text-xs"
+                  type="button"
+                  disabled={busy}
+                  onClick={onRejectEvent}
+                >
+                  Reject
+                </Button>
+              </>
+            )}
+          </div>
+        ) : null}
+      </div>
+    </li>
+  );
+}
 
 export default function OperationsPage() {
   const [data, setData] = useState<ReservationOperationsResponse | null>(null);
@@ -156,11 +347,11 @@ export default function OperationsPage() {
         const o = await getReservationOperations(token);
         setData(o);
       } catch (err) {
-        const message =
+        setError(
           typeof err === 'object' && err && 'message' in err
             ? String((err as { message: unknown }).message)
-            : 'Failed to load reservation operations';
-        setError(message);
+            : 'Failed to load reservation operations',
+        );
         setData(null);
       } finally {
         setLoading(false);
@@ -203,13 +394,8 @@ export default function OperationsPage() {
           Reservation operations
         </h1>
         <p className="mt-1 text-sm text-zinc-600">
-          Pending requests and status changes in the last 7 days for your scope
-          (restaurants in view: {data?.scopeRestaurantCount ?? 0}).
-        </p>
-        <p className="mt-1 text-sm text-zinc-500">
-          <Link className="underline" href="/dashboard">
-            ← Dashboard
-          </Link>
+          Pending and recent work for your scope (restaurants in view:{' '}
+          {data?.scopeRestaurantCount ?? 0}).
         </p>
       </div>
 
@@ -240,7 +426,7 @@ export default function OperationsPage() {
               <StatLine
                 label="Rejected or cancelled (7d)"
                 value={data.summary.rejectedOrCancelledLast7dCount}
-                sub="Terminal states, by last update"
+                sub="By last update"
               />
             </div>
           </div>
@@ -298,23 +484,27 @@ export default function OperationsPage() {
                       row={row}
                       showEventTitle
                       showRequestSlot
+                      showActions
+                      onAfterAction={load}
                     />
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm text-zinc-500">No pending items match the filters.</p>
+                <p className="text-sm text-zinc-500">
+                  No pending items match the filters.
+                </p>
               )
             ) : (
               <p className="text-sm text-zinc-500">
-                This section is only for pending work. Set status to “All
-                statuses” or “Pending” to see open requests.
+                Set status to &quot;All&quot; or &quot;Pending&quot; for pending
+                work.
               </p>
             )}
           </div>
 
           <div>
             <h2 className="mb-2 text-sm font-semibold text-zinc-900">
-              Recent activity (7 days, last update)
+              Recent activity (7 days)
             </h2>
             {filteredRecent.length > 0 ? (
               <ul className="space-y-2">
@@ -324,14 +514,13 @@ export default function OperationsPage() {
                     row={row}
                     showEventTitle
                     showRequestSlot
+                    showActions={false}
+                    onAfterAction={load}
                   />
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-zinc-500">
-                No items match the filters. (Includes HELD/COMPLETED table states
-                when type is not filtered to event-only.)
-              </p>
+              <p className="text-sm text-zinc-500">No items match the filters.</p>
             )}
           </div>
         </>
