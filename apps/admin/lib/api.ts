@@ -853,3 +853,52 @@ export function markAllNotificationsRead(
   });
 }
 
+export type ReservationOperationsTableItem = {
+  type: 'TABLE';
+  id: string;
+  restaurant: { id: string; name: string };
+  status: ReservationStatus;
+  partySize: number;
+  startAt: string;
+  endAt: string;
+  requestedAt: string;
+  note: string | null;
+  customer: { fullName: string; email: string; phone: string | null };
+};
+
+export type ReservationOperationsEventItem = {
+  type: 'EVENT';
+  id: string;
+  eventId: string;
+  eventTitle: string;
+  eventStartsAt: string;
+  eventEndsAt: string;
+  restaurant: { id: string; name: string };
+  status: EventReservationStatus;
+  partySize: number;
+  requestedAt: string;
+  note: string | null;
+  customer: { fullName: string; email: string; phone: string | null };
+};
+
+export type ReservationOperationsResponse = {
+  scopeRestaurantCount: number;
+  summary: {
+    pendingTableCount: number;
+    pendingEventCount: number;
+    confirmedLast24hCount: number;
+    rejectedOrCancelledLast7dCount: number;
+  };
+  needsAttention: Array<ReservationOperationsTableItem | ReservationOperationsEventItem>;
+  recentActivity: Array<ReservationOperationsTableItem | ReservationOperationsEventItem>;
+};
+
+export function getReservationOperations(
+  token: string,
+): Promise<ReservationOperationsResponse> {
+  return apiRequest<ReservationOperationsResponse>(
+    '/me/reservation-operations',
+    { method: 'GET', token },
+  );
+}
+

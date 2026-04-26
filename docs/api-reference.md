@@ -180,7 +180,7 @@ All routes: **Bearer** + **PLATFORM_ADMIN** only.
 
 ## 4. Me
 
-Paths are grouped by concern. **Reservation** routes (below) are **Bearer** + **`CUSTOMER`** only. **In-app notifications** under `/me/notifications` are **Bearer** + **`CUSTOMER`**, **`RESTAURANT_ADMIN`**, or **`PLATFORM_ADMIN`** — each user only sees their own `Notification` rows in the database.
+Paths are grouped by concern. **Reservation** routes in §4.1 are **Bearer** + **`CUSTOMER`** only. **In-app notifications** under `/me/notifications` are **Bearer** + **`CUSTOMER`**, **`RESTAURANT_ADMIN`**, or **`PLATFORM_ADMIN`** — each user only sees their own `Notification` rows in the database. **`GET /me/reservation-operations`** (§4.0.1) is **Bearer** + **`RESTAURANT_ADMIN`** or **`PLATFORM_ADMIN`** and aggregates per-restaurant reservation work for the admin app (not for the mobile **CUSTOMER** role).
 
 ### 4.0 In-app notifications (stored in DB, no push)
 
@@ -222,6 +222,19 @@ Paths are grouped by concern. **Reservation** routes (below) are **Bearer** + **
 
 - **Table:** Restaurant/platform moves a request to **CONFIRMED** or **REJECTED** → the **customer** gets one notification. **Customer** cancels a table request (eligible states) → each user assigned to that **restaurant** in `restaurant_admins` gets a notification. Idempotent: duplicate logical sends use a unique `dedupeKey` so retries do not create duplicates.
 - **Event:** Same pattern for event reservation **confirm/reject** (customer) and **customer cancel** (assigned restaurant admins). Event **capacity** rules and transition validation are unchanged; notifications are written only after a successful state change in the same transaction as the update where applicable.
+
+### 4.0.1 `GET /me/reservation-operations` (admin dashboard, staff)
+
+| | |
+|---|--|
+| **Purpose** | One round-trip work queue: pending table and event **reservation** requests, plus an activity feed (7 days by `updatedAt`) for table and event rows that are not **PENDING**. Summary counts: pending, confirmed in the last 24h (by `updatedAt` on the row), rejected or cancelled in the last 7 days. Does **not** perform status changes. |
+| **Auth** | **Bearer**; **`RESTAURANT_ADMIN`**, **`PLATFORM_ADMIN`** only |
+| **403** | `CUSTOMER` (not a staff work queue) |
+| **Scope** | **Restaurant admin:** `restaurant_admins` — only that restaurant’s rows. **Platform admin:** all restaurants. Empty lists and zero counts if the restaurant admin has no assignments. |
+
+**200 (shape, abbreviated):** `scopeRestaurantCount: number` — how many restaurants are in scope. `summary: { pendingTableCount, pendingEventCount, confirmedLast24hCount, rejectedOrCancelledLast7dCount }` — all integers, scope-wide. `needsAttention` — up to 100 **PENDING** table and event items combined, sorted by `requestedAt` (row `createdAt` as ISO) descending, **TABLE** and **EVENT** as distinct `type` values. `recentActivity` — up to 100 items from the last 7 days where the row has a “recent” table status (not `PENDING`) or event status in **CONFIRMED** / **REJECTED** / **CANCELLED**; sort by `updatedAt` descending. Each list item is either a **TABLE** or **EVENT** object with `restaurant { id, name }`, `customer` contact, `status`, `partySize`, `requestedAt`, and `note` (mirrors `specialRequest`). **TABLE** adds `startAt`/`endAt` (ISO). **EVENT** adds `eventId`, `eventTitle`, `eventStartsAt`, `eventEndsAt` (ISO). Admin deep links: table → `/dashboard/restaurants/{restaurantId}/reservations?reservationId=`; event → `…/event-reservations?eventReservationId=` and `eventId` when set — same as in-app notification routing for staff.
+
+**Rules:** This endpoint is **read-only**; table and event **status transition** rules, capacity on event **CONFIRMED**, and notification side effects of updates are **unchanged** and apply only to the standard restaurant-scoped `PATCH` routes.
 
 ## 4.1 Reservations (customer)
 

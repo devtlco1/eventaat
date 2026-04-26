@@ -4,10 +4,11 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import {
   getMe,
+  getReservationOperations,
   listRestaurants,
-  listRestaurantReservations,
   listUsers,
   type MeResponse,
+  type ReservationOperationsResponse,
   type Restaurant,
 } from '../../lib/api';
 import { getToken } from '../../lib/auth';
@@ -17,8 +18,7 @@ type OverviewData = {
   restaurants: Restaurant[];
   totalUsers: number | null;
   restaurantAdminUsers: number | null;
-  reservationsInFirstRestaurant: number | null;
-  reservationSampleRestaurantId: string | null;
+  reservationOperations: ReservationOperationsResponse | null;
 };
 
 function StatCard({
@@ -97,16 +97,12 @@ export default function DashboardPage() {
           restaurantAdminUsers = raUsers.length;
         }
 
-        const first = restaurants[0] ?? null;
-        let reservationsInFirstRestaurant: number | null = null;
-        let reservationSampleRestaurantId: string | null = first?.id ?? null;
-
-        if (first && (me.role === 'PLATFORM_ADMIN' || me.role === 'RESTAURANT_ADMIN')) {
+        let reservationOperations: ReservationOperationsResponse | null = null;
+        if (me.role === 'PLATFORM_ADMIN' || me.role === 'RESTAURANT_ADMIN') {
           try {
-            const resList = await listRestaurantReservations(token, first.id);
-            reservationsInFirstRestaurant = resList.length;
+            reservationOperations = await getReservationOperations(token);
           } catch {
-            reservationsInFirstRestaurant = null;
+            reservationOperations = null;
           }
         }
 
@@ -116,8 +112,7 @@ export default function DashboardPage() {
           restaurants,
           totalUsers,
           restaurantAdminUsers,
-          reservationsInFirstRestaurant,
-          reservationSampleRestaurantId: reservationSampleRestaurantId,
+          reservationOperations,
         });
       } catch (err) {
         const message =
@@ -139,13 +134,8 @@ export default function DashboardPage() {
   const isRestaurantAdmin = data?.me.role === 'RESTAURANT_ADMIN';
   const restaurants = data?.restaurants ?? [];
   const activeCount = restaurants.filter((r) => r.isActive).length;
-  const firstId = data?.reservationSampleRestaurantId ?? null;
-  const canViewRestaurantReservations =
-    isPlatformAdmin || isRestaurantAdmin;
-  const reservationsPath =
-    firstId !== null && canViewRestaurantReservations
-      ? `/dashboard/restaurants/${firstId}/reservations`
-      : '/dashboard/restaurants';
+  const canViewOperations = isPlatformAdmin || isRestaurantAdmin;
+  const ops = data?.reservationOperations;
 
   return (
     <div className="space-y-8">
@@ -201,16 +191,34 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {data.reservationsInFirstRestaurant !== null && firstId ? (
+          {canViewOperations && ops ? (
             <div>
               <h2 className="mb-3 text-sm font-semibold text-zinc-900">
-                Reservations
+                Reservation work
               </h2>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <p className="mb-3 text-sm text-zinc-600">
+                Counts and pending requests across the restaurants in your
+                access ({ops.scopeRestaurantCount} restaurant
+                {ops.scopeRestaurantCount === 1 ? '' : 's'}).
+              </p>
+              <div className="mb-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <StatCard
-                  label="Reservations (sample)"
-                  value={data.reservationsInFirstRestaurant}
-                  sub={`For «${data.restaurants.find((r) => r.id === firstId)?.name ?? 'first restaurant'}» — total across that restaurant only`}
+                  label="Pending table"
+                  value={ops.summary.pendingTableCount}
+                />
+                <StatCard
+                  label="Pending event"
+                  value={ops.summary.pendingEventCount}
+                />
+                <StatCard
+                  label="Confirmed (24h)"
+                  value={ops.summary.confirmedLast24hCount}
+                  sub="By last update"
+                />
+                <StatCard
+                  label="Rejected / cancelled (7d)"
+                  value={ops.summary.rejectedOrCancelledLast7dCount}
+                  sub="By last update"
                 />
               </div>
             </div>
@@ -233,15 +241,13 @@ export default function DashboardPage() {
                   description="View and edit users, roles, and active status."
                 />
               ) : null}
-              <QuickActionCard
-                href={reservationsPath}
-                title="View reservations"
-                description={
-                  canViewRestaurantReservations && firstId
-                    ? 'Open reservations for the first restaurant in your list (sample).'
-                    : 'Browse restaurants, then open reservations for a venue.'
-                }
-              />
+              {canViewOperations ? (
+                <QuickActionCard
+                  href="/dashboard/operations"
+                  title="Reservation operations"
+                  description="Pending table and event requests, and recent status changes, with links to the right list."
+                />
+              ) : null}
             </div>
           </div>
         </>
