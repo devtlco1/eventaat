@@ -1,0 +1,94 @@
+# eventaat — API endpoint inventory
+
+**Base URL (local):** `http://localhost:4000`  
+**OpenAPI JSON:** [http://localhost:4000/docs-json](http://localhost:4000/docs-json) (with API running)  
+**Handwritten reference (detail):** [api-reference.md](api-reference.md)
+
+| Total endpoints | 47 |
+|-----------------|----|
+
+## Count by module (domain)
+
+| Module | Count | Description |
+|--------|------:|-------------|
+| `health` | 1 | Liveness and DB check |
+| `auth` | 4 | Register, login, session, admin smoke test |
+| `users` | 3 | Platform user directory and updates |
+| `me` | 4 | Customer: own table and event reservation lists and cancellations |
+| `restaurants` | 35 | Restaurants CRUD, ops, events, both reservation types, tables, assignments |
+
+The `restaurants` controller (single Nest `@Controller('restaurants')`) is split below by domain for clarity. Paths still live under `/restaurants/...`.
+
+| Restaurants subdomain | Count |
+|-----------------------|------:|
+| Core CRUD & get-by-id | 4 |
+| Availability, operating & opening hours, profile | 7 |
+| Contacts | 4 |
+| Event nights (events) | 6 |
+| Event reservations | 3 |
+| Admin assignments | 3 |
+| Tables | 4 |
+| Table reservations | 4 |
+| *Subtotal* | *35* |
+
+---
+
+## Endpoint table (compact)
+
+All paths are relative to the base URL. Unless noted, JSON request bodies follow the global `ValidationPipe` (unknown fields on DTO routes → **400**).
+
+| Method | Path | Module | Auth | Roles | Status | Notes |
+|--------|------|--------|------|------|--------|--------|
+| GET | `/health` | health | No | — | implemented | 200: service + DB status |
+| POST | `/auth/register` | auth | No | — | implemented | 201: creates CUSTOMER (default) |
+| POST | `/auth/login` | auth | No | — | implemented | 200: `{ accessToken, user }` |
+| GET | `/auth/me` | auth | Bearer | any | implemented | 401: invalid or missing token |
+| GET | `/auth/admin-check` | auth | Bearer | PLATFORM_ADMIN | implemented | 403: non-platform |
+| GET | `/users` | users | Bearer | PLATFORM_ADMIN | implemented | Optional query: `role`, `isActive` |
+| GET | `/users/:id` | users | Bearer | PLATFORM_ADMIN | implemented | 404: unknown user |
+| PATCH | `/users/:id` | users | Bearer | PLATFORM_ADMIN | implemented | Partial user update |
+| GET | `/me/event-reservations` | me | Bearer | CUSTOMER | implemented | List caller’s event reservations |
+| PATCH | `/me/event-reservations/:eventReservationId/cancel` | me | Bearer | CUSTOMER | implemented | Optional body `{ "note"?: string }` |
+| GET | `/me/reservations` | me | Bearer | CUSTOMER | implemented | List caller’s table reservations |
+| PATCH | `/me/reservations/:reservationId/cancel` | me | Bearer | CUSTOMER | implemented | Optional body `{ "note"?: string }` |
+| POST | `/restaurants` | restaurants (core) | Bearer | PLATFORM_ADMIN | implemented | Create restaurant |
+| GET | `/restaurants` | restaurants (core) | Bearer | any | implemented | Admins may see inactive |
+| GET | `/restaurants/:id` | restaurants (core) | Bearer | any | implemented | 404: inactive for non-admins (policy) |
+| PATCH | `/restaurants/:id` | restaurants (core) | Bearer | PLATFORM_ADMIN | implemented | Update core restaurant fields |
+| GET | `/restaurants/:restaurantId/availability` | restaurants (availability) | Bearer | any | implemented | Query: `date`, `partySize`, `durationMinutes` |
+| GET | `/restaurants/:restaurantId/operating-settings` | restaurants (ops) | Bearer | any | implemented | |
+| PATCH | `/restaurants/:restaurantId/operating-settings` | restaurants (ops) | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | R-A only if assigned to restaurant |
+| GET | `/restaurants/:restaurantId/opening-hours` | restaurants (ops) | Bearer | any | implemented | |
+| PATCH | `/restaurants/:restaurantId/opening-hours` | restaurants (ops) | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | |
+| GET | `/restaurants/:restaurantId/profile` | restaurants (ops) | Bearer | any | implemented | Extended profile fields |
+| PATCH | `/restaurants/:restaurantId/profile` | restaurants (ops) | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | |
+| GET | `/restaurants/:restaurantId/contacts` | restaurants (contacts) | Bearer | any | implemented | |
+| POST | `/restaurants/:restaurantId/contacts` | restaurants (contacts) | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | |
+| PATCH | `/restaurants/:restaurantId/contacts/:contactId` | restaurants (contacts) | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | |
+| DELETE | `/restaurants/:restaurantId/contacts/:contactId` | restaurants (contacts) | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | 204 |
+| GET | `/restaurants/:restaurantId/events` | event nights | Bearer | any | implemented | Query: includes admin-only filter fields |
+| POST | `/restaurants/:restaurantId/events` | event nights | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | Create; starts PENDING review |
+| GET | `/restaurants/:restaurantId/events/:eventId` | event nights | Bearer | any | implemented | |
+| PATCH | `/restaurants/:restaurantId/events/:eventId/review` | event nights | Bearer | PLATFORM_ADMIN | implemented | Approve/reject PENDING only |
+| PATCH | `/restaurants/:restaurantId/events/:eventId` | event nights | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | |
+| DELETE | `/restaurants/:restaurantId/events/:eventId` | event nights | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | Soft deactivate (204) |
+| POST | `/restaurants/:restaurantId/events/:eventId/reservations` | event reservations | Bearer | CUSTOMER | implemented | Body: `partySize`, optional `specialRequest` — **not** a table booking |
+| GET | `/restaurants/:restaurantId/event-reservations` | event reservations | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | Query: `eventId?` (optional) |
+| PATCH | `/restaurants/:restaurantId/event-reservations/:eventReservationId/status` | event reservations | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | `CONFIRMED` / `REJECTED`; capacity on confirm |
+| POST | `/restaurants/:id/admins` | admin assignments | Bearer | PLATFORM_ADMIN | implemented | Body: `{ "userId" }` |
+| GET | `/restaurants/:id/admins` | admin assignments | Bearer | PLATFORM_ADMIN | implemented | |
+| DELETE | `/restaurants/:id/admins/:userId` | admin assignments | Bearer | PLATFORM_ADMIN | implemented | 204 |
+| POST | `/restaurants/:restaurantId/tables` | tables | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | |
+| GET | `/restaurants/:restaurantId/tables` | tables | Bearer | any | implemented | Customer: active only |
+| GET | `/restaurants/:restaurantId/tables/:tableId` | tables | Bearer | any | implemented | Customer: inactive table → 404 |
+| PATCH | `/restaurants/:restaurantId/tables/:tableId` | tables | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | |
+| POST | `/restaurants/:restaurantId/reservations` | table reservations | Bearer | CUSTOMER | implemented | **Table** booking request (optional `tableId`) |
+| GET | `/restaurants/:restaurantId/reservations` | table reservations | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | R-A: assigned only |
+| GET | `/restaurants/:restaurantId/reservations/:reservationId/history` | table reservations | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | |
+| PATCH | `/restaurants/:restaurantId/reservations/:reservationId/status` | table reservations | Bearer | PLATFORM_ADMIN, RESTAURANT_ADMIN | implemented | Transitions + optional `note` |
+
+*No endpoints are currently marked **deprecated** or **planned** in this inventory; future routes should be added here in the same commit as code changes (see [README.md](../README.md#api-documentation)).*
+
+## Maintenance
+
+When you add, change, or remove an API route, update this file and [api-reference.md](api-reference.md) in the same commit. See the root [README.md](../README.md#api-documentation).

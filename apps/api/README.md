@@ -2,6 +2,8 @@
 
 NestJS + Prisma backend for eventaat. PostgreSQL is the database.
 
+**API documentation (all endpoints, roles, examples):** see the monorepo **[`docs/api-reference.md`](../../docs/api-reference.md)** and the compact **[`docs/api-inventory.md`](../../docs/api-inventory.md)**. With the server running: **OpenAPI** at `/docs` and `/docs-json` (e.g. [http://localhost:4000/docs](http://localhost:4000/docs)). New or changed routes must update those two markdown files in the **same commit** (see the root [README.md](../../README.md#api-documentation)).
+
 ## Request validation
 
 All DTO-typed request bodies and query objects are validated by a global `ValidationPipe` in `src/main.ts`: **`whitelist: true`**, **`forbidNonWhitelisted: true`**, **`transform: true`**, and **`transformOptions: { enableImplicitConversion: true }`**. Client mistakes typically return **400** with a `message` array (Nest’s default), before controllers run. Do not rely on unknown JSON fields being ignored—they are **rejected** for routes that use a DTO.
@@ -24,19 +26,11 @@ curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:4000/auth/login 
 - `RestaurantsModule` with CRUD-ish endpoints (no DELETE in MVP — use `isActive=false`).
 - Create/Update locked to `PLATFORM_ADMIN`. List/Read open to any authenticated user (active only; admins see inactive too).
 
-## Endpoints (Step 6 surface)
+## Endpoints (legacy snapshot — use docs instead)
 
-| Method | Path                | Auth                                  |
-|--------|---------------------|---------------------------------------|
-| POST   | `/auth/register`    | public                                |
-| POST   | `/auth/login`       | public                                |
-| GET    | `/auth/me`          | Bearer                                |
-| GET    | `/auth/admin-check` | Bearer + `PLATFORM_ADMIN`             |
-| POST   | `/restaurants`      | Bearer + `PLATFORM_ADMIN`             |
-| GET    | `/restaurants`      | Bearer (admin sees inactive too)      |
-| GET    | `/restaurants/:id`  | Bearer (404 on inactive for non-admin)|
-| PATCH  | `/restaurants/:id`  | Bearer + `PLATFORM_ADMIN`             |
-| GET    | `/health`           | public                                |
+> **Source of truth:** the complete route list, roles, and tables are in **[`docs/api-reference.md`](../../docs/api-reference.md)** and **[`docs/api-inventory.md`](../../docs/api-inventory.md)**. The app exposes **~47** HTTP operations across health, auth, users, me, and restaurants (including table and event flows).
+
+The sections below (event nights, event reservations) retain useful curl context; they do not list every table-reservation or profile route. Prefer the `docs/api-*.md` files when wiring clients.
 
 ### Restaurant event nights
 

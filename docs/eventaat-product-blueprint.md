@@ -7,6 +7,8 @@ This document describes the product vision, principles, and roadmap for **eventa
 
 **Local development setup (tooling, ports, Docker):** see [local-development.md](local-development.md).
 
+**HTTP API contract (all routes, auth, and inventory for engineers):** [api-reference.md](api-reference.md), [api-inventory.md](api-inventory.md). Route changes are **not** complete until those files are updated in the same work (see the root [README.md](../README.md#api-documentation)). Optional OpenAPI: `/docs` and `/docs-json` on the running API.
+
 The HTTP API enforces request validation globally (class-validator on DTOs): invalid payloads, unknown body properties on typed routes, and malformed query values should fail with **400** before business logic runs. Details: [`apps/api/README.md`](../apps/api/README.md#request-validation).
 
 ---

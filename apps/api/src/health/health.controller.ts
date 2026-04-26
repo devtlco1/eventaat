@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { PrismaService } from '../prisma/prisma.service';
 
 type DatabaseStatus = 'ok' | 'unavailable';
@@ -13,6 +14,7 @@ interface HealthResponse {
   uptimeSeconds: number;
 }
 
+@ApiTags('health')
 @Controller('health')
 export class HealthController {
   constructor(private readonly prisma: PrismaService) {}

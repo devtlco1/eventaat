@@ -7,6 +7,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { SafeUser } from '../users/users.service';
 import { AuthService } from './auth.service';
 import { CurrentUser } from './current-user.decorator';
@@ -16,6 +17,7 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { Roles } from './roles.decorator';
 import { RolesGuard } from './roles.guard';
 
+@ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
@@ -37,6 +39,7 @@ export class AuthController {
    * Requires a valid Bearer token; passwordHash is already stripped.
    */
   @Get('me')
+  @ApiBearerAuth('bearer')
   @UseGuards(JwtAuthGuard)
   me(@CurrentUser() user: SafeUser): SafeUser {
     return user;
@@ -48,6 +51,7 @@ export class AuthController {
    * Will be replaced by real admin endpoints in later steps.
    */
   @Get('admin-check')
+  @ApiBearerAuth('bearer')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('PLATFORM_ADMIN')
   adminCheck(@CurrentUser() user: SafeUser): { ok: true; user: SafeUser } {

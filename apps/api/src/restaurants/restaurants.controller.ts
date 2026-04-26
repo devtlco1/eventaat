@@ -12,6 +12,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   Restaurant,
   RestaurantAdmin,
@@ -52,6 +53,8 @@ import { RestaurantsService } from './restaurants.service';
  * RolesGuard is also active; @Roles() on a method narrows it further.
  * Methods without @Roles() are open to any authenticated user.
  */
+@ApiTags('restaurants')
+@ApiBearerAuth('bearer')
 @Controller('restaurants')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class RestaurantsController {

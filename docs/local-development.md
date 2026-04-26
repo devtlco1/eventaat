@@ -98,6 +98,8 @@ Health check:
 curl http://localhost:4000/health
 ```
 
+**API reference (browsing):** with the API up, you can open [http://localhost:4000/docs](http://localhost:4000/docs) (Swagger UI) and [http://localhost:4000/docs-json](http://localhost:4000/docs-json) (OpenAPI JSON). The canonical handoff for developers remains the repo **[api-reference.md](api-reference.md)** and **[api-inventory.md](api-inventory.md)** — see the root [README.md](../README.md#api-documentation).
+
 **Optional (watch / hot reload):**
 
 ```bash

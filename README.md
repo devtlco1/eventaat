@@ -2,7 +2,17 @@
 
 Restaurant table reservation platform.
 
-**Local development:** **[docs/local-development.md](docs/local-development.md)** (Node 22, Docker Postgres, API, admin with webpack, Expo). **Product vision & roadmap:** **[docs/eventaat-product-blueprint.md](docs/eventaat-product-blueprint.md)**.
+**Local development:** **[docs/local-development.md](docs/local-development.md)** (Node 22, Docker Postgres, API, admin with webpack, Expo). **Product vision & roadmap:** **[docs/eventaat-product-blueprint.md](docs/eventaat-product-blueprint.md)**. **API reference (human):** **[docs/api-reference.md](docs/api-reference.md)** · **Endpoint inventory (table + counts):** **[docs/api-inventory.md](docs/api-inventory.md)**.
+
+## API documentation
+
+- **Narrated contract & examples:** [docs/api-reference.md](docs/api-reference.md) — method, path, auth, roles, request/response shapes, and business rules.
+- **Index & counts:** [docs/api-inventory.md](docs/api-inventory.md) — single table of all routes, **47** endpoints, grouped by domain.
+- **OpenAPI (when the API is running, default port 4000):** [http://localhost:4000/docs](http://localhost:4000/docs) (Swagger UI) and [http://localhost:4000/docs-json](http://localhost:4000/docs-json) (JSON). Supplements the markdown; **the markdown and inventory are the definition of done** for prose and the route list.
+
+### API documentation maintenance (definition of done)
+
+Any **add, change, or removal** of an HTTP route must update [docs/api-reference.md](docs/api-reference.md) and [docs/api-inventory.md](docs/api-inventory.md) **in the same commit** as the code. Treat API docs as part of the same deliverable. Cursor (and any other) prompts that modify backend routes should explicitly include these documentation updates.
 
 ## Structure
 
@@ -56,7 +66,7 @@ Minimal API smoke test after following that doc:
 curl http://localhost:4000/health
 ```
 
-API details, curl examples, and **request validation** (global DTO `ValidationPipe`): [`apps/api/README.md`](apps/api/README.md#request-validation).
+**Full API surface (all modules):** [docs/api-reference.md](docs/api-reference.md). **Request validation** (global DTO `ValidationPipe`): [apps/api/README.md](apps/api/README.md#request-validation).
 
 ## CI (GitHub Actions)
 

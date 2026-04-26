@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -8,6 +9,8 @@ import { CancelMyReservationDto } from './dto/cancel-my-reservation.dto';
 import { EventReservationService } from './event-reservation.service';
 import { RestaurantsService } from './restaurants.service';
 
+@ApiTags('me')
+@ApiBearerAuth('bearer')
 @Controller('me')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class MeController {
